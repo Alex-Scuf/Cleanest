@@ -28,6 +28,8 @@
     UseCustomColor: false,
     HideNowPlayingSidebar: false
   };
+  
+  // Объединенный массив ползунков
   const sliders = [
     {
       id: "blur",
@@ -47,6 +49,24 @@
       max: 200,
       step: 2,
       defVal: 120,
+    },
+    {
+      id: "npv-ambience-spread",
+      name: "Ambience Spread",
+      min: 0,
+      max: 50,
+      step: 1,
+      defVal: 10,
+      end: "px",
+    },
+    {
+      id: "npv-ambience-blur",
+      name: "Ambience Blur",
+      min: 0,
+      max: 50,
+      step: 1,
+      defVal: 15,
+      end: "px",
     },
   ];
 
@@ -508,42 +528,6 @@
     onSongChange();
   }
 
-  // Input for custom background images (disabled until properly implemented)
-  /* const bannerInput = document.createElement("input");
-  bannerInput.type = "file";
-  bannerInput.className = "banner-input";
-  bannerInput.accept = [
-    "image/jpeg",
-    "image/apng",
-    "image/avif",
-    "image/gif",
-    "image/png",
-    "image/svg+xml",
-    "image/webp",
-  ].join(",");
-
-  // When user selects a custom background image
-  bannerInput.onchange = () => {
-    if (!bannerInput.files.length) return;
-
-    const file = bannerInput.files[0];
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target.result;
-      const [, , uid] = Spicetify.Platform.History.location.pathname.split("/");
-      if (!uid) {
-        try {
-          localStorage.setItem("cleanest:startupBg", result);
-        } catch {
-          Spicetify.showNotification("File too large");
-          return;
-        }
-        document.querySelector("#home-select img").src = result;
-      }
-    };
-    reader.readAsDataURL(file);
-  }; */
-
   // Create edit home topbar button
   const homeEdit = new Spicetify.Topbar.Button("Cleanest Settings", "edit", () => {
     const content = document.createElement("div");
@@ -659,19 +643,6 @@
       img.src = srcInput.value
     })
 
-    /* const editButton = content.querySelector(
-      ".main-editImageButton-image.main-editImageButton-overlay"
-    );
-    editButton.onclick = () => {
-      bannerInput.click();
-    };
-    const removeButton = content.querySelector(
-      ".main-playlistEditDetailsModal-imageDropDownButton"
-    );
-    removeButton.onclick = () => {
-      content.querySelector("img").src = defImage;
-    }; */
-
     const buttonsRow = document.createElement("div");
     buttonsRow.style.display = "flex";
     buttonsRow.style.paddingTop = "15px";
@@ -783,30 +754,17 @@
   homeEdit.element.classList.toggle("hidden", false);
 })();
 
-
-
-
-
 // NAME: NPV Ambience
 // AUTHOR: OhItsTom (modified)
 // DESCRIPTION: Adds a colorful glow behind the Now Playing View image.
-//
-// MODIFIED: glow is now centered on the cover art and grows symmetrically
-// in every direction by a fixed, independently-configurable amount,
-// instead of being stretched to the full cover width and stuck to a
-// height that tracked the sidebar's panel width.
-//
-// To adjust the glow size, change the two values below:
-const AMBIENCE_SPREAD_PX = 10;      // how far the glow extends beyond the cover art, in px (try 8-30)
-const AMBIENCE_BLUR_PX = 15;        // blur amount, in px
 
 // Append Styling To Head
 (function initStyle() {
 	const style = document.createElement("style");
 	style.textContent = `
 		:root {
-			--npv-ambience-spread: ${AMBIENCE_SPREAD_PX}px;
-			--npv-ambience-blur: ${AMBIENCE_BLUR_PX}px;
+			--npv-ambience-spread: 10px;
+			--npv-ambience-blur: 15px;
 		}
 
 		/* Real elements attached to <body> (not inside the sidebar's DOM
@@ -850,7 +808,6 @@ const AMBIENCE_BLUR_PX = 15;        // blur amount, in px
 		.Root__right-sidebar aside:has(.main-nowPlayingView-headerContainer) .main-nowPlayingView-mainContainer {
 		    padding-top: 64px;
 		}
-		/*  */
 
 		/* compatibility: spotify<1.2.87; spicetify<v2.43.2 ("<", not "=<") */
 		.Root__right-sidebar aside .xjf0Pj3YnoegOkJUpaPS {
@@ -871,7 +828,6 @@ const AMBIENCE_BLUR_PX = 15;        // blur amount, in px
 		.Root__right-sidebar aside:has(.xjf0Pj3YnoegOkJUpaPS) .wfJD_yK4h7xnpTmrh62U {
 			padding-top: 64px;
 		}
-		/*  */
 
 		/* compatibility: spotify=1.2.51; spicetify v2.38.5 */
 		.Root__right-sidebar aside .W3E0IT3_STcazjTeyOJa, .Root__right-sidebar aside .ZbDMGdU4aBOnrNLowNRq {
@@ -892,8 +848,6 @@ const AMBIENCE_BLUR_PX = 15;        // blur amount, in px
 		.Root__right-sidebar aside:has(.W3E0IT3_STcazjTeyOJa) .zduvaX0Ioxqd5ypeWoAf, .Root__right-sidebar aside:has(.ZbDMGdU4aBOnrNLowNRq) .main-buddyFeed-scrollBarContainer:not(:has(.main-buddyFeed-content > .main-buddyFeed-header)) {
 			padding-top: 64px;
 		}
-		/*  */
-
 
 		.Root__right-sidebar aside {
 			--background-base: var(--spice-main) !important;
@@ -916,12 +870,6 @@ const AMBIENCE_BLUR_PX = 15;        // blur amount, in px
 
 	const SIDES = ["top", "bottom", "left", "right"];
 
-	// Create 4 thin "frame" strips per filter layer (top/bottom/left/right),
-	// attached directly to <body>. Because each strip only ever occupies the
-	// margin area around the cover art — never the cover art's own
-	// rectangle — it's safe to keep them at a high z-index (always drawn on
-	// top) without ever actually covering the artwork itself, sidestepping
-	// the app's unpredictable internal stacking order entirely.
 	function makeLayerSet(modifierClass) {
 		const set = {};
 		for (const side of SIDES) {
@@ -946,15 +894,13 @@ const AMBIENCE_BLUR_PX = 15;        // blur amount, in px
 		}
 	}
 
-	// Keep each strip locked to the cover art's on-screen position/size
-	// every frame, so it tracks scrolling/resizing/collapsing.
 	let lastRectKey = "";
 	function syncPosition() {
 		const cover = document.querySelector(".main-nowPlayingView-coverArtContainer");
 		if (cover) {
 			const rect = cover.getBoundingClientRect();
-			const spread = AMBIENCE_SPREAD_PX;
-			const key = `${rect.top}|${rect.left}|${rect.width}|${rect.height}`;
+			const spread = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--npv-ambience-spread")) || 10;
+			const key = `${rect.top}|${rect.left}|${rect.width}|${rect.height}|${spread}`;
 			if (key !== lastRectKey) {
 				lastRectKey = key;
 				const outerW = rect.width + spread * 2;

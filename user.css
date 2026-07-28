@@ -2554,7 +2554,7 @@ HOME POPUP
   margin-bottom: 20px;
 }
 
-div[aria-label="Hazy Settings"] .main-trackCreditsModal-mainSection {
+div[aria-label="Cleanest Settings"] .main-trackCreditsModal-mainSection {
   overflow-y: hidden;
   padding: 24px;
 }
@@ -2567,14 +2567,14 @@ div[aria-label="Hazy Settings"] .main-trackCreditsModal-mainSection {
   width: 225px;
 }
 
-.hazyOptionRow {
+.cleanestOptionRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding-top: 10px;
 }
 
-button.hazyOptionToggle {
+button.cleanestOptionToggle {
   display: flex;
   background-color: transparent;
   border: none;
@@ -2712,7 +2712,7 @@ span.toggle.enabled {
   width: 100%;
 }
 
-.hazyOptionDesc {
+.cleanestOptionDesc {
   text-align: right;
   margin-right: 10px;
   font-size: 0.875rem;
@@ -3038,14 +3038,16 @@ HIDE NOW PLAYING SIDEBAR
 ----------------------*/
 
 /* Hide not completely collapsed sidebar */
-body.__hazy_hidenowplayingsidebar .Root__right-sidebar:has(div[aria-hidden=true]) {
+body.__cleanest_hidenowplayingsidebar .Root__right-sidebar:has(div[aria-hidden=true]) {
   display: none !important;
 }
 
 /* Compensate for extra gap space when right sidebar is hidden */
-body.__hazy_hidenowplayingsidebar .Root__top-container:has(.Root__right-sidebar div[aria-hidden=true]) .Root__main-view {
+body.__cleanest_hidenowplayingsidebar .Root__top-container:has(.Root__right-sidebar div[aria-hidden=true]) .Root__main-view {
   width: calc(100% + var(--panel-gap)) !important;
 }
+
+
 
 
 
@@ -3239,50 +3241,6 @@ display: none !important;
 
 
 
-
-/* ============================================================
-   liked-songs-cover-dynamic-accent.css
-   Snippet для Spicetify Marketplace.
-
-   Меняет обложку плейлиста "Liked Songs" на чёрный фон + сердце,
-   ОКРАШЕННОЕ В ЦВЕТ ТЕКУЩЕГО ТРЕКА — тот же динамический акцентный
-   цвет, который тема Hazy уже использует для других элементов
-   (название трека, значок закреплённого плейлиста и т.п.), когда
-   меняется обложка играющего сейчас трека.
-
-   КАК НАШЛИ ЭТОТ ЦВЕТ:
-   Через DevTools проверили несколько кандидатов в getComputedStyle
-   на :root. Переменная --spice-accent оказалась именно той, что
-   меняется в реальном времени по обложке текущего трека (подтверждено
-   тестом: при зелёной обложке --spice-accent = #1e8a70, у других
-   обложек — другие цвета). Зеркальная переменная
-   --essential-bright-accent всегда совпадает с ней же.
-
-   ПОЧЕМУ СЕРДЦЕ РИСУЕТСЯ ЧЕРЕЗ MASK, А НЕ BACKGROUND-IMAGE С ЦВЕТОМ
-   В SVG:
-   Раньше цвет сердца был зашит прямо в SVG (fill='%23ff0000') —
-   значение фиксированное и не может реагировть на CSS-переменные.
-   Чтобы цвет можно было передать через var(--spice-accent), форма
-   сердца теперь задаётся как mask-image (определяет ТОЛЬКО форму,
-   без цвета), а сам цвет — через background-color псевдоэлемента,
-   который эту маску использует. Так форма и цвет разделены, и цвет
-   можно подключить к любой CSS-переменной.
-
-   Обложка "Liked Songs" сама по себе — обычный растровый PNG с CDN
-   Spotify (misc.scdn.co/liked-songs/...), поэтому красить её пиксели
-   напрямую нельзя — картинку затемняем до чёрного силуэта, а сердце
-   рисуем отдельным слоем поверх через ::after на родительском
-   контейнере (img — replaced-элемент, ::after на нём не рендерится).
-
-   Как установить:
-   1. В Spotify открой Marketplace в сайдбаре.
-   2. Перейди на вкладку Snippets.
-   3. Нажми "+" / "Add new snippet".
-   4. Вставь содержимое этого файла целиком в поле кода.
-   5. Сохрани и включи сниппет (toggle ON).
-   6. Если у тебя уже стоял предыдущий сниппет про эту же обложку —
-      выключи/удали его, чтобы правила не конфликтовали.
-   ============================================================ */
 
 /* Шаг 1: превращаем исходный PNG (градиент + белое сердце) в сплошной
    чёрный силуэт. Покрывает оба места — сайдбар и страницу плейлиста */

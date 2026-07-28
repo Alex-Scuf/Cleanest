@@ -5,7 +5,7 @@
   "readme": "README.md",
   "usercss": "user.css",
   "schemes": "color.ini",
-  "extension": "theme.js",
+  "include": "https://github.com/Alex-Scuf/Cleanest/main/theme.js",
   "authors": [
     {
       "name": "Alex-Scuf",

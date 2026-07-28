@@ -20,6 +20,7 @@ These include:
 * Listening activity
 * Lyrics (Because I using "Spicy Lyrics")
 * Merch
+* Credits
 * About Artist
 * Tours
 * Switch to video

@@ -1,0 +1,16 @@
+{
+  "name": "Cleanest",
+  "description": "A cleanest spicetify theme based o the "Hazy" theme,
+  "preview": "preview.png",
+  "readme": "README.md",
+  "usercss": "user.css",
+  "schemes": "color.ini",
+  "extension": "theme.js",
+  "authors": [
+    {
+      "name": "Alex-Scuf",
+      "url": "https://github.com/Alex-Scuf"
+    }
+  ],
+  "tags": ["transparent", "clean"]
+}

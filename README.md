@@ -13,7 +13,7 @@ A Spicetify theme based on the <a href="https://github.com/Astromations/Hazy">"H
 #### 1. The "Liked Songs" cover art now adapts to the changing theme color.
 
 #### 2. A glow effect has been added for the track cover art.
-Since the cover art sits outside the sidebar boundaries, the glow can seamlessly extend beyond them. You can adjust the glow's brightness and blur in <b>"themes.js"</b> (I will add a setting for this in the options menu soon).
+Since the cover art sits outside the sidebar boundaries, the glow can seamlessly extend beyond them. You can adjust the glow's brightness and blur in Theme Settings.
 
 #### 3. A large number of elements that I find useless have been hidden.
 These include:

@@ -1,11 +1,11 @@
-(function hazy() {
+(function cleanest() {
   if (!Spicetify?.Platform || !Spicetify?.Platform?.History?.listen) {
-    setTimeout(hazy, 100);
+    setTimeout(cleanest, 100);
     return;
   }
 
-  const defImage = "https://i.imgur.com/Wl2D0h0.png";
-  let startImage = localStorage.getItem("hazy:startupBg") || defImage;
+  const defImage = "https://i.imgur.com/efnK6MN.png";
+  let startImage = localStorage.getItem("cleanest:startupBg") || defImage;
   const toggleInfo = [
     {
       id: "UseCustomBackground",
@@ -51,7 +51,7 @@
   ];
 
   (function sidebar() {
-    if (localStorage.getItem("Hazy Sidebar Activated")) return;
+    if (localStorage.getItem("Cleanest Sidebar Activated")) return;
     // Sidebar settings
     const parsedObject = JSON.parse(
       localStorage.getItem("spicetify-exp-features")
@@ -85,7 +85,7 @@
       "spicetify-exp-features",
       JSON.stringify(parsedObject)
     );
-    localStorage.setItem("Hazy Sidebar Activated", true);
+    localStorage.setItem("Cleanest Sidebar Activated", true);
     if (reload) {
       window.location.reload();
       reload = false;
@@ -297,7 +297,7 @@
         const zoomFactor = newOuterWidth / newInnerWidth || 1;
         document.documentElement.style.setProperty("--zoom", zoomFactor);
         console.debug(
-          `[Hazy] Zoom Updated: ${newOuterWidth} / ${newInnerWidth} = ${zoomFactor}`
+          `[Cleanest] Zoom Updated: ${newOuterWidth} / ${newInnerWidth} = ${zoomFactor}`
         );
 
         // Update previous values
@@ -499,10 +499,10 @@
     toggles.HideNowPlayingSidebar = JSON.parse(localStorage.getItem("HideNowPlayingSidebar"));
 
     if (toggles.HideNowPlayingSidebar) {
-      document.body.classList.add("__hazy_hidenowplayingsidebar");
+      document.body.classList.add("__cleanest_hidenowplayingsidebar");
     }
     else {
-      document.body.classList.remove("__hazy_hidenowplayingsidebar");
+      document.body.classList.remove("__cleanest_hidenowplayingsidebar");
     }
 
     onSongChange();
@@ -533,7 +533,7 @@
       const [, , uid] = Spicetify.Platform.History.location.pathname.split("/");
       if (!uid) {
         try {
-          localStorage.setItem("hazy:startupBg", result);
+          localStorage.setItem("cleanest:startupBg", result);
         } catch {
           Spicetify.showNotification("File too large");
           return;
@@ -545,7 +545,7 @@
   }; */
 
   // Create edit home topbar button
-  const homeEdit = new Spicetify.Topbar.Button("Hazy Settings", "edit", () => {
+  const homeEdit = new Spicetify.Topbar.Button("Cleanest Settings", "edit", () => {
     const content = document.createElement("div");
     content.innerHTML = `
     <div class="main-playlistEditDetailsModal-albumCover" id="home-select">
@@ -560,10 +560,10 @@
     function createToggle(opt) {
       let { id, name, defVal } = opt;
       const toggleRow = document.createElement("div");
-      toggleRow.classList.add("hazyOptionRow");
+      toggleRow.classList.add("cleanestOptionRow");
       toggleRow.innerHTML = `
-      <span class="hazyOptionDesc">${name}:</span>
-      <button class="hazyOptionToggle">
+      <span class="cleanestOptionDesc">${name}:</span>
+      <button class="cleanestOptionToggle">
         <span class="toggleWrapper">
           <span class="toggle"></span>
         </span>
@@ -583,7 +583,7 @@
       let { id, name, min, max, step, defVal, end } = opt;
       const val = localStorage.getItem(`${id}Amount`) || defVal;
       const slider = document.createElement("div");
-      slider.classList.add("hazyOptionRow");
+      slider.classList.add("cleanestOptionRow");
       slider.innerHTML = `
       <div class="slider-container">
         <label for="${id}-input">${name}:</label>
@@ -628,7 +628,7 @@
 
     // Additional settings (added by lily)
     const colorRow = document.createElement("div");
-    colorRow.classList.add("hazyOptionRow");
+    colorRow.classList.add("cleanestOptionRow");
 
     // Color label
     const colorLabel = document.createElement("label");
@@ -653,7 +653,7 @@
     loadSliders();
 
     img = content.querySelector("img");
-    img.src = localStorage.getItem("hazy:startupBg") || defImage;
+    img.src = localStorage.getItem("cleanest:startupBg") || defImage;
 
     srcInput.addEventListener("input", () => {
       img.src = srcInput.value
@@ -725,7 +725,7 @@
 
       // Update changed bg image
       startImage = srcInput.value || content.querySelector("img").src;
-      localStorage.setItem("hazy:startupBg", startImage);
+      localStorage.setItem("cleanest:startupBg", startImage);
 
       // Save the selected custom color (added by lily)
       localStorage.setItem(
@@ -737,14 +737,14 @@
         localStorage.setItem(
           opt.id,
           document
-            .querySelector(`.hazyOptionRow[name=${opt.id}] .toggle`)
+            .querySelector(`.cleanestOptionRow[name=${opt.id}] .toggle`)
             .classList.contains("enabled")
         )
       );
       sliders.forEach((opt) =>
         localStorage.setItem(
           opt.id + "Amount",
-          document.querySelector(`.hazyOptionRow #${opt.id}-input`).value
+          document.querySelector(`.cleanestOptionRow #${opt.id}-input`).value
         )
       );
 
@@ -754,15 +754,15 @@
 
     resetButton.onclick = () => {
       sliders.forEach((opt) => {
-        document.querySelector(`.hazyOptionRow #${opt.id}-input`).value =
+        document.querySelector(`.cleanestOptionRow #${opt.id}-input`).value =
           opt.defVal;
         document.querySelector(
-          `.hazyOptionRow #${opt.id}-value`
+          `.cleanestOptionRow #${opt.id}-value`
         ).textContent = `${opt.defVal}${opt.end || "%"}`;
       });
       toggleInfo.forEach((opt) => {
         document
-          .querySelector(`.hazyOptionRow[name=${opt.id}] .toggle`)
+          .querySelector(`.cleanestOptionRow[name=${opt.id}] .toggle`)
           .classList.toggle("enabled", opt.defVal);
       });
       document.getElementById("src-input").value = defImage;
@@ -773,12 +773,12 @@
     const issueButton = document.createElement("a");
     issueButton.classList.add("issue-button");
     issueButton.innerHTML = "Report Issue";
-    issueButton.href = "https://github.com/Astromations/Hazy/issues";
+    issueButton.href = "https://github.com/Alex-Scuf/Cleanest/issues";
 
     buttonsRow.append(issueButton, resetButton, saveButton);
     content.append(buttonsRow);
 
-    Spicetify.PopupModal.display({ title: "Hazy Settings", content });
+    Spicetify.PopupModal.display({ title: "Cleanest Settings", content });
   });
   homeEdit.element.classList.toggle("hidden", false);
 })();
@@ -787,7 +787,15 @@
 
 
 
-
+// NAME: NPV Ambience
+// AUTHOR: OhItsTom (modified)
+// DESCRIPTION: Adds a colorful glow behind the Now Playing View image.
+//
+// MODIFIED: glow is now centered on the cover art and grows symmetrically
+// in every direction by a fixed, independently-configurable amount,
+// instead of being stretched to the full cover width and stuck to a
+// height that tracked the sidebar's panel width.
+//
 // To adjust the glow size, change the two values below:
 const AMBIENCE_SPREAD_PX = 10;      // how far the glow extends beyond the cover art, in px (try 8-30)
 const AMBIENCE_BLUR_PX = 15;        // blur amount, in px

@@ -3,7 +3,7 @@
   "description": "A cleanest spicetify theme based o the Hazy theme. An ultra-clean theme.",
   "preview": "preview.png",
   "readme": "README.md",
-  "usercss": "user.css",
+  "usercss": "https://cdn.jsdelivr.net/gh/Alex-Scuf/Cleanest@main/user.css",
   "schemes": "https://cdn.jsdelivr.net/gh/Alex-Scuf/Cleanest@main/color.ini",
   "include": ["https://cdn.jsdelivr.net/gh/Alex-Scuf/Cleanest@main/theme.js"],
   "authors": [

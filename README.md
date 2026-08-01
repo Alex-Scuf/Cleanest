@@ -1,7 +1,8 @@
-# Cleanest
-A Spicetify theme based on the <a href="https://github.com/Astromations/Hazy">"Hazy"</a> theme. An ultra-clean theme.
+<h1 align=center>Cleanest</h1>
+<P align=center>A Spicetify theme based on the <a href="https://github.com/Astromations/Hazy">"Hazy"</a> theme
+  <BR>An ultra-clean theme</BR></P>
 
-# Preview
+<h1 align=center>Preview</h1>
 <img width="1913" height="1037" alt="preview" src="https://github.com/user-attachments/assets/da8fed12-4deb-4d28-8e55-267e7630308c" />
 
 <img width="1911" height="1036" alt="preview2" src="https://github.com/user-attachments/assets/17e18b72-bc29-4af0-a85e-29a28c2c1e9a" />
@@ -23,6 +24,7 @@ Since the cover art sits outside the sidebar boundaries, the glow can seamlessly
 
 You can adjust the glow's brightness and blur in Theme Settings. These are all the settings for now:
 <img width="438" height="956" alt="preview4" src="https://github.com/user-attachments/assets/aa226c9a-c7b6-4b97-afcb-6804da59a17f" />
+
 More settings will be added in the future.
 
 #### 3. A large number of elements that I find useless have been hidden.

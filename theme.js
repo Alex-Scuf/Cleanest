@@ -22,14 +22,18 @@
       name: "Hide now playing sidebar",
       defVal: false,
     },
+    {
+      id: "AmbienceReactive",
+      name: "Ambience reacts to music loudness",
+      defVal: true,
+    },
   ];
   const toggles = {
     UseCustomBackground: false,
     UseCustomColor: false,
-    HideNowPlayingSidebar: false
+    HideNowPlayingSidebar: false,
+    AmbienceReactive: true
   };
-  
-  // Объединенный массив ползунков
   const sliders = [
     {
       id: "blur",
@@ -50,6 +54,10 @@
       step: 2,
       defVal: 120,
     },
+    // Ambience glow (Now Playing View) — ids match the CSS custom property
+    // names used further down (--npv-ambience-spread / --npv-ambience-blur),
+    // so loadSliders()/saveButton/resetButton handle them automatically
+    // without any extra wiring.
     {
       id: "npv-ambience-spread",
       name: "Ambience Spread",
@@ -67,6 +75,38 @@
       step: 1,
       defVal: 15,
       end: "px",
+    },
+    {
+      id: "npv-ambience-reactive-min",
+      name: "Reactive Min Brightness",
+      min: 20,
+      max: 100,
+      step: 5,
+      defVal: 70,
+    },
+    {
+      id: "npv-ambience-reactive-max",
+      name: "Reactive Max Brightness",
+      min: 100,
+      max: 300,
+      step: 5,
+      defVal: 150,
+    },
+    {
+      id: "npv-ambience-reactive-size-max",
+      name: "Bass Size Boost",
+      min: 100,
+      max: 400,
+      step: 10,
+      defVal: 160,
+    },
+    {
+      id: "npv-ambience-reactive-smoothing",
+      name: "Reactive Smoothness",
+      min: 5,
+      max: 100,
+      step: 5,
+      defVal: 25,
     },
   ];
 
@@ -518,6 +558,19 @@
     toggles.UseCustomColor = JSON.parse(localStorage.getItem("UseCustomColor"));
     toggles.HideNowPlayingSidebar = JSON.parse(localStorage.getItem("HideNowPlayingSidebar"));
 
+    // AmbienceReactive defaults to ON (unlike the others, which default to
+    // off), so a missing localStorage entry (first run) must resolve to true.
+    const storedReactive = localStorage.getItem("AmbienceReactive");
+    toggles.AmbienceReactive = storedReactive === null ? true : JSON.parse(storedReactive);
+    // The ambience glow lives in a separate, self-contained script block (its
+    // own IIFE) and can't see this `toggles` object directly, so the value is
+    // mirrored onto a CSS custom property — which is plain DOM state and so
+    // is readable from anywhere, regardless of which script block set it.
+    document.documentElement.style.setProperty(
+      "--npv-ambience-reactive-enabled",
+      toggles.AmbienceReactive ? 1 : 0
+    );
+
     if (toggles.HideNowPlayingSidebar) {
       document.body.classList.add("__cleanest_hidenowplayingsidebar");
     }
@@ -527,6 +580,42 @@
 
     onSongChange();
   }
+
+  // Input for custom background images (disabled until properly implemented)
+  /* const bannerInput = document.createElement("input");
+  bannerInput.type = "file";
+  bannerInput.className = "banner-input";
+  bannerInput.accept = [
+    "image/jpeg",
+    "image/apng",
+    "image/avif",
+    "image/gif",
+    "image/png",
+    "image/svg+xml",
+    "image/webp",
+  ].join(",");
+
+  // When user selects a custom background image
+  bannerInput.onchange = () => {
+    if (!bannerInput.files.length) return;
+
+    const file = bannerInput.files[0];
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target.result;
+      const [, , uid] = Spicetify.Platform.History.location.pathname.split("/");
+      if (!uid) {
+        try {
+          localStorage.setItem("cleanest:startupBg", result);
+        } catch {
+          Spicetify.showNotification("File too large");
+          return;
+        }
+        document.querySelector("#home-select img").src = result;
+      }
+    };
+    reader.readAsDataURL(file);
+  }; */
 
   // Create edit home topbar button
   const homeEdit = new Spicetify.Topbar.Button("Cleanest Settings", "edit", () => {
@@ -643,6 +732,19 @@
       img.src = srcInput.value
     })
 
+    /* const editButton = content.querySelector(
+      ".main-editImageButton-image.main-editImageButton-overlay"
+    );
+    editButton.onclick = () => {
+      bannerInput.click();
+    };
+    const removeButton = content.querySelector(
+      ".main-playlistEditDetailsModal-imageDropDownButton"
+    );
+    removeButton.onclick = () => {
+      content.querySelector("img").src = defImage;
+    }; */
+
     const buttonsRow = document.createElement("div");
     buttonsRow.style.display = "flex";
     buttonsRow.style.paddingTop = "15px";
@@ -754,17 +856,49 @@
   homeEdit.element.classList.toggle("hidden", false);
 })();
 
+
+
+
+
 // NAME: NPV Ambience
 // AUTHOR: OhItsTom (modified)
 // DESCRIPTION: Adds a colorful glow behind the Now Playing View image.
+//
+// MODIFIED: glow is now centered on the cover art and grows symmetrically
+// in every direction by a fixed, independently-configurable amount,
+// instead of being stretched to the full cover width and stuck to a
+// height that tracked the sidebar's panel width.
+//
+// To adjust the glow size, change the two values below:
+const AMBIENCE_SPREAD_PX = 10;      // how far the glow extends beyond the cover art, in px (try 8-30)
+const AMBIENCE_BLUR_PX = 15;        // blur amount, in px
+
+// Reactive brightness ("volume visualizer"): pulses the glow using the
+// track's own loudness curve — Spotify's per-segment audio analysis data
+// (the same pre-computed data classic Spotify visualizers use) — replayed
+// in sync with playback position. This is NOT live captured system audio:
+// the actual decoded audio stream can't be tapped from JS (Spotify decrypts
+// it through Widevine DRM), so there's no way to read real-time volume from
+// the browser. This instead reads Spotify's own analysis of how loud the
+// track is at the current position, which gives a genuinely music-reactive
+// pulse (louder on beats/hits, dimmer in quiet parts) without needing that.
+// Reactive brightness is now fully controlled by the "Ambience reacts to
+// music loudness" toggle in the settings menu (see toggleInfo above) —
+// these three are just the fallback values used before the menu has ever
+// been opened / if a variable somehow isn't set:
+const AMBIENCE_REACTIVE_MIN = 0.7;        // brightness multiplier during quiet parts
+const AMBIENCE_REACTIVE_MAX = 1.5;        // brightness multiplier at loudness peaks
+const AMBIENCE_REACTIVE_SIZE_MAX = 1.6;   // size multiplier at loudness peaks (independent of brightness)
+const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, lower = smoother
 
 // Append Styling To Head
 (function initStyle() {
 	const style = document.createElement("style");
 	style.textContent = `
 		:root {
-			--npv-ambience-spread: 10px;
-			--npv-ambience-blur: 15px;
+			--npv-ambience-spread: ${AMBIENCE_SPREAD_PX}px;
+			--npv-ambience-blur: ${AMBIENCE_BLUR_PX}px;
+			--npv-ambience-reactive-brightness: 1;
 		}
 
 		/* Real elements attached to <body> (not inside the sidebar's DOM
@@ -775,6 +909,7 @@
 			position: fixed;
 			pointer-events: none;
 			background-repeat: no-repeat;
+			background-blend-mode: multiply;
 			transition: background 0.5s ease, opacity 0.5s ease;
 			opacity: var(--npv-ambience-opacity, 0);
 			z-index: 9999;
@@ -782,12 +917,19 @@
 		}
 
 		.npv-ambience-glow-layer--saturate {
-			filter: blur(var(--npv-ambience-blur)) saturate(2);
+			filter: blur(var(--npv-ambience-blur)) saturate(2) brightness(var(--npv-ambience-reactive-brightness, 1));
 		}
 
 		.npv-ambience-glow-layer--contrast {
-			filter: blur(var(--npv-ambience-blur)) contrast(2);
+			filter: blur(var(--npv-ambience-blur)) contrast(2) brightness(var(--npv-ambience-reactive-brightness, 1));
 		}
+
+		/* NOTE: the fade to the outer edge is no longer done via mask-image
+		   (it never visibly worked in this environment after two attempts).
+		   Instead, setImage() below layers a white->black gradient (per
+		   side) UNDER the photo with background-blend-mode: multiply —
+		   white preserves the photo near the cover, black darkens it toward
+		   the outer edge, faking transparency without depending on mask. */
 
 		/* compatibility: since spotify 1.2.87; spicetify v2.42.2 */
 		.Root__right-sidebar aside .main-nowPlayingView-headerContainer {
@@ -808,6 +950,7 @@
 		.Root__right-sidebar aside:has(.main-nowPlayingView-headerContainer) .main-nowPlayingView-mainContainer {
 		    padding-top: 64px;
 		}
+		/*  */
 
 		/* compatibility: spotify<1.2.87; spicetify<v2.43.2 ("<", not "=<") */
 		.Root__right-sidebar aside .xjf0Pj3YnoegOkJUpaPS {
@@ -828,6 +971,7 @@
 		.Root__right-sidebar aside:has(.xjf0Pj3YnoegOkJUpaPS) .wfJD_yK4h7xnpTmrh62U {
 			padding-top: 64px;
 		}
+		/*  */
 
 		/* compatibility: spotify=1.2.51; spicetify v2.38.5 */
 		.Root__right-sidebar aside .W3E0IT3_STcazjTeyOJa, .Root__right-sidebar aside .ZbDMGdU4aBOnrNLowNRq {
@@ -848,6 +992,8 @@
 		.Root__right-sidebar aside:has(.W3E0IT3_STcazjTeyOJa) .zduvaX0Ioxqd5ypeWoAf, .Root__right-sidebar aside:has(.ZbDMGdU4aBOnrNLowNRq) .main-buddyFeed-scrollBarContainer:not(:has(.main-buddyFeed-content > .main-buddyFeed-header)) {
 			padding-top: 64px;
 		}
+		/*  */
+
 
 		.Root__right-sidebar aside {
 			--background-base: var(--spice-main) !important;
@@ -870,11 +1016,28 @@
 
 	const SIDES = ["top", "bottom", "left", "right"];
 
+	// Direction each side's "near cover -> outer edge" axis points in.
+	// Paired with background-blend-mode: multiply (white = no change,
+	// black = darken to nothing), this fakes the fade-to-transparent that
+	// mask-image was supposed to do.
+	const FADE_GRADIENT = {
+		top: "linear-gradient(to top, white, black)",
+		bottom: "linear-gradient(to bottom, white, black)",
+		left: "linear-gradient(to left, white, black)",
+		right: "linear-gradient(to right, white, black)",
+	};
+
+	// Create 4 thin "frame" strips per filter layer (top/bottom/left/right),
+	// attached directly to <body>. Because each strip only ever occupies the
+	// margin area around the cover art — never the cover art's own
+	// rectangle — it's safe to keep them at a high z-index (always drawn on
+	// top) without ever actually covering the artwork itself, sidestepping
+	// the app's unpredictable internal stacking order entirely.
 	function makeLayerSet(modifierClass) {
 		const set = {};
 		for (const side of SIDES) {
 			const el = document.createElement("div");
-			el.className = `npv-ambience-glow-layer ${modifierClass}`;
+			el.className = `npv-ambience-glow-layer ${modifierClass} npv-ambience-glow-layer--side-${side}`;
 			document.body.appendChild(el);
 			set[side] = el;
 		}
@@ -885,67 +1048,285 @@
 	const contrastLayers = makeLayerSet("npv-ambience-glow-layer--contrast");
 	const allLayers = [saturateLayers, contrastLayers];
 
-	function setImage(url) {
-		const bg = `url(${url})`;
-		for (const layerSet of allLayers) {
-			for (const side of SIDES) {
-				layerSet[side].style.backgroundImage = bg;
+	// --- Reactive brightness state ---
+	let audioSegments = null;   // segments[] from Spicetify.getAudioData() — fallback source (overall loudness)
+	let segmentCursor = 0;      // index into audioSegments, advanced as playback progresses
+	let loudnessFloor = -30;    // this track's own quietest segment peak (dB), for normalization
+	let loudnessCeil = -5;      // this track's own loudest segment peak (dB), for normalization
+	let audioBeats = null;      // beats[] from Spicetify.getAudioData() — primary source (rhythmic "punch")
+	let beatCursor = 0;
+	let smoothedBrightness = 1;
+	let smoothedSizeMult = 1;
+
+	async function loadAudioAnalysis() {
+		audioSegments = null;
+		segmentCursor = 0;
+		audioBeats = null;
+		beatCursor = 0;
+		// Always fetched regardless of the reactive toggle, so switching it
+		// on in settings takes effect immediately instead of waiting for
+		// the next song change.
+		try {
+			const data = await Spicetify.getAudioData();
+
+			const beats = data && data.beats;
+			if (beats && beats.length) audioBeats = beats;
+
+			const segments = data && data.segments;
+			if (!segments || !segments.length) return;
+
+			let min = Infinity, max = -Infinity;
+			for (const s of segments) {
+				if (typeof s.loudness_max === "number") {
+					if (s.loudness_max < min) min = s.loudness_max;
+					if (s.loudness_max > max) max = s.loudness_max;
+				}
+			}
+			// Use this track's own dynamic range when it's meaningful; otherwise
+			// fall back to a generic range rather than dividing by ~0.
+			if (isFinite(min) && isFinite(max) && max - min >= 1) {
+				loudnessFloor = min;
+				loudnessCeil = max;
+			} else {
+				loudnessFloor = -30;
+				loudnessCeil = -5;
+			}
+			audioSegments = segments;
+		} catch (err) {
+			// Not every track has analysis data (podcasts, some local files, etc.)
+			audioSegments = null;
+			audioBeats = null;
+		}
+	}
+
+	// Spotify doesn't expose a bass/frequency-band-specific signal — only
+	// overall segment loudness and beat timings. The closest honest proxy
+	// for "reacts to the bass" is a sharp flash on each detected beat
+	// (kick/bass usually drives the rhythmic pulse in most music), decaying
+	// quickly afterward — rather than the broader, slower loudness curve
+	// (which vocals/cymbals/etc. also move).
+	function getBeatPunch(posSec) {
+		if (!audioBeats || audioBeats.length === 0) return null;
+
+		if (beatCursor >= audioBeats.length) beatCursor = audioBeats.length - 1;
+		if (posSec < audioBeats[beatCursor].start) {
+			let lo = 0, hi = audioBeats.length - 1;
+			while (lo < hi) {
+				const mid = (lo + hi + 1) >> 1;
+				if (audioBeats[mid].start <= posSec) lo = mid;
+				else hi = mid - 1;
+			}
+			beatCursor = lo;
+		} else {
+			while (beatCursor + 1 < audioBeats.length && audioBeats[beatCursor + 1].start <= posSec) {
+				beatCursor++;
 			}
 		}
+
+		const beat = audioBeats[beatCursor];
+		const sinceBeat = Math.max(posSec - beat.start, 0);
+		const confidence = typeof beat.confidence === "number" ? beat.confidence : 0.6;
+		const decaySeconds = 0.2; // how quickly the flash fades after each beat
+		return confidence * Math.exp(-sinceBeat / decaySeconds);
+	}
+
+	function findSegmentIndex(posSec) {
+		let lo = 0, hi = audioSegments.length - 1;
+		while (lo < hi) {
+			const mid = (lo + hi + 1) >> 1;
+			if (audioSegments[mid].start <= posSec) lo = mid;
+			else hi = mid - 1;
+		}
+		return lo;
+	}
+
+	// Interpolates this instant's loudness (dB) from the segment covering
+	// posSec, following Spotify's own attack/release shape for that segment:
+	// loudness_start -> loudness_max (at loudness_max_time) -> loudness_end.
+	function getSegmentLoudnessDb(posSec) {
+		if (!audioSegments || audioSegments.length === 0) return null;
+
+		if (segmentCursor >= audioSegments.length) segmentCursor = audioSegments.length - 1;
+		if (posSec < audioSegments[segmentCursor].start) {
+			segmentCursor = findSegmentIndex(posSec); // seeked backward — relocate
+		} else {
+			while (
+				segmentCursor + 1 < audioSegments.length &&
+				audioSegments[segmentCursor + 1].start <= posSec
+			) {
+				segmentCursor++;
+			}
+		}
+
+		const seg = audioSegments[segmentCursor];
+		const tInSeg = posSec - seg.start;
+		const maxT = seg.loudness_max_time || 0;
+		const loudEnd = typeof seg.loudness_end === "number" ? seg.loudness_end : seg.loudness_max;
+
+		if (tInSeg <= maxT) {
+			const span = Math.max(maxT, 0.001);
+			const p = Math.min(Math.max(tInSeg / span, 0), 1);
+			return seg.loudness_start + (seg.loudness_max - seg.loudness_start) * p;
+		}
+		const span = Math.max(seg.duration - maxT, 0.001);
+		const p = Math.min(Math.max((tInSeg - maxT) / span, 0), 1);
+		return seg.loudness_max + (loudEnd - seg.loudness_max) * p;
+	}
+
+	function setImage(metadata) {
+		// Using the full-res image here on purpose: at larger Spread values
+		// the source gets stretched over a much bigger virtual canvas (see
+		// the "windowing" technique in syncPosition below) before being
+		// blurred — a smaller source image stretched that far washes out
+		// into a flat, textureless smear instead of a soft colorful glow.
+		const url = metadata.image_xlarge_url || metadata.image_large_url || metadata.image_url;
+		for (const layerSet of allLayers) {
+			for (const side of SIDES) {
+				// Two stacked background layers: the fade gradient (painted
+				// first, on top) and the actual photo underneath — combined
+				// via background-blend-mode: multiply set in CSS.
+				layerSet[side].style.backgroundImage = `${FADE_GRADIENT[side]}, url(${url})`;
+			}
+		}
+	}
+
+	// Keep each strip locked to the cover art's on-screen position/size,
+	// and pulse brightness with the track's loudness at the current
+	// position — but only while Now Playing View's cover art actually
+	// exists in the DOM. The loop stops itself the moment the cover art
+	// disappears (sidebar collapsed, NPV closed, navigated away, etc.)
+	// instead of running forever at 60fps in the background — that
+	// constant work (recalculating style + repainting several blurred,
+	// filtered layers every single frame indefinitely) is what was driving
+	// up CPU and, over long sessions, memory.
+	// Spotify's own progress reporting (Spicetify.Player.getProgress()) only
+	// updates in coarse bursts, not every frame — using it directly caused
+	// the pulse to visibly lag behind the actual beat. Instead, interpolate
+	// the exact position ourselves from the last known position + how much
+	// wall-clock time has passed since then, which is accurate to the frame.
+	function getPrecisePositionMs() {
+		const data = Spicetify.Player.data;
+		if (!data) return 0;
+		if (data.isPaused) return data.positionAsOfTimestamp || 0;
+		return (data.positionAsOfTimestamp || 0) + (Date.now() - (data.timestamp || Date.now()));
 	}
 
 	let lastRectKey = "";
+	let lastWrittenBrightness = "";
+	let loopRunning = false;
+
 	function syncPosition() {
 		const cover = document.querySelector(".main-nowPlayingView-coverArtContainer");
-		if (cover) {
-			const rect = cover.getBoundingClientRect();
-			const spread = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--npv-ambience-spread")) || 10;
-			const key = `${rect.top}|${rect.left}|${rect.width}|${rect.height}|${spread}`;
-			if (key !== lastRectKey) {
-				lastRectKey = key;
-				const outerW = rect.width + spread * 2;
-				const outerH = rect.height + spread * 2;
-				const outerLeft = rect.left - spread;
-				const outerTop = rect.top - spread;
-				const bgSize = `${outerW}px ${outerH}px`;
+		if (!cover) {
+			loopRunning = false;
+			document.documentElement.style.setProperty("--npv-ambience-opacity", 0);
+			return; // don't reschedule — a cheap low-frequency check wakes this back up
+		}
 
-				const bands = {
-					top:    { left: outerLeft, top: outerTop, width: outerW, height: spread, bgX: 0, bgY: 0 },
-					bottom: { left: outerLeft, top: rect.bottom, width: outerW, height: spread, bgX: 0, bgY: -(outerH - spread) },
-					left:   { left: outerLeft, top: rect.top, width: spread, height: rect.height, bgX: 0, bgY: -spread },
-					right:  { left: rect.right, top: rect.top, width: spread, height: rect.height, bgX: -(outerW - spread), bgY: -spread },
-				};
+		const rootStyle = getComputedStyle(document.documentElement);
+		const baseSpread = Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-spread")) || AMBIENCE_SPREAD_PX;
+		const reactiveEnabled = rootStyle.getPropertyValue("--npv-ambience-reactive-enabled").trim() !== "0";
+		const reactiveMin = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-min")) || AMBIENCE_REACTIVE_MIN * 100) / 100;
+		const reactiveMax = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-max")) || AMBIENCE_REACTIVE_MAX * 100) / 100;
+		const reactiveSizeMax = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-size-max")) || AMBIENCE_REACTIVE_SIZE_MAX * 100) / 100;
+		const reactiveSmoothing = Math.min(Math.max((Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-smoothing")) || AMBIENCE_REACTIVE_SMOOTHING * 100) / 100, 0.01), 1);
+		// Size always eases noticeably slower than brightness by default —
+		// snappy brightness flashes read as punchy, but snapping the actual
+		// size every beat looks jerky/twitchy, so it's deliberately damped
+		// to a fraction of the main smoothness setting rather than exposed
+		// as yet another slider.
+		const sizeSmoothing = Math.max(reactiveSmoothing * 0.35, 0.02);
 
-				for (const layerSet of allLayers) {
-					for (const side of SIDES) {
-						const b = bands[side];
-						const el = layerSet[side];
-						el.style.top = `${b.top}px`;
-						el.style.left = `${b.left}px`;
-						el.style.width = `${b.width}px`;
-						el.style.height = `${b.height}px`;
-						el.style.backgroundSize = bgSize;
-						el.style.backgroundPosition = `${b.bgX}px ${b.bgY}px`;
-					}
+		// Compute the raw 0-1 "punch" strength once — brightness and size
+		// each map it through their own independent range below, so you can
+		// have a subtle brightness flash with a big size swell, or vice versa.
+		let punchNorm = 0;
+		if (reactiveEnabled) {
+			const posSec = getPrecisePositionMs() / 1000;
+			const punch = getBeatPunch(posSec);
+			if (punch !== null) {
+				// Beat-synced flash — the "reacts to the bass/kick" behavior.
+				punchNorm = Math.min(punch, 1);
+			} else if (audioSegments) {
+				// No beat data for this track — fall back to overall loudness.
+				const db = getSegmentLoudnessDb(posSec);
+				if (db !== null) {
+					punchNorm = Math.min(Math.max((db - loudnessFloor) / (loudnessCeil - loudnessFloor), 0), 1);
 				}
 			}
-			document.documentElement.style.setProperty("--npv-ambience-opacity", rect.width > 0 ? 1 : 0);
-		} else {
-			document.documentElement.style.setProperty("--npv-ambience-opacity", 0);
 		}
+
+		const targetBrightness = reactiveMin + punchNorm * (reactiveMax - reactiveMin);
+		smoothedBrightness += (targetBrightness - smoothedBrightness) * reactiveSmoothing;
+		const roundedBrightness = smoothedBrightness.toFixed(3);
+		if (roundedBrightness !== lastWrittenBrightness) {
+			lastWrittenBrightness = roundedBrightness;
+			document.documentElement.style.setProperty("--npv-ambience-reactive-brightness", roundedBrightness);
+		}
+
+		// Size pulses independently, with its own (gentler) easing — grows
+		// from the base Spread up toward Bass Size Boost at full punch.
+		const targetSizeMult = 1 + punchNorm * (reactiveSizeMax - 1);
+		smoothedSizeMult += (targetSizeMult - smoothedSizeMult) * sizeSmoothing;
+		const spread = Math.min(Math.max(baseSpread * smoothedSizeMult, 2), 200);
+
+		const rect = cover.getBoundingClientRect();
+		const key = `${rect.top}|${rect.left}|${rect.width}|${rect.height}|${spread.toFixed(1)}`;
+		if (key !== lastRectKey) {
+			lastRectKey = key;
+			const outerW = rect.width + spread * 2;
+			const outerH = rect.height + spread * 2;
+			const outerLeft = rect.left - spread;
+			const outerTop = rect.top - spread;
+			const bgSize = `${outerW}px ${outerH}px`;
+
+			const bands = {
+				top:    { left: outerLeft, top: outerTop, width: outerW, height: spread, bgX: 0, bgY: 0 },
+				bottom: { left: outerLeft, top: rect.bottom, width: outerW, height: spread, bgX: 0, bgY: -(outerH - spread) },
+				left:   { left: outerLeft, top: rect.top, width: spread, height: rect.height, bgX: 0, bgY: -spread },
+				right:  { left: rect.right, top: rect.top, width: spread, height: rect.height, bgX: -(outerW - spread), bgY: -spread },
+			};
+
+			for (const layerSet of allLayers) {
+				for (const side of SIDES) {
+					const b = bands[side];
+					const el = layerSet[side];
+					el.style.top = `${b.top}px`;
+					el.style.left = `${b.left}px`;
+					el.style.width = `${b.width}px`;
+					el.style.height = `${b.height}px`;
+					el.style.backgroundSize = `100% 100%, ${bgSize}`;
+					el.style.backgroundPosition = `0 0, ${b.bgX}px ${b.bgY}px`;
+				}
+			}
+		}
+		document.documentElement.style.setProperty("--npv-ambience-opacity", rect.width > 0 ? 1 : 0);
+
 		requestAnimationFrame(syncPosition);
 	}
 
+	function ensureLoopRunning() {
+		if (loopRunning) return;
+		if (!document.querySelector(".main-nowPlayingView-coverArtContainer")) return;
+		loopRunning = true;
+		requestAnimationFrame(syncPosition);
+	}
+
+	// Cheap, infrequent check (2x/sec) for whether Now Playing View's cover
+	// art has appeared — this is what (re)starts the real per-frame loop
+	// above, and is what lets it fully stop (no timers, no listeners, no
+	// work at all) while NPV is closed.
+	setInterval(ensureLoopRunning, 500);
+
 	// Initialization
-	setImage(Spicetify.Player.data.item.metadata.image_xlarge_url);
-	requestAnimationFrame(syncPosition);
+	setImage(Spicetify.Player.data.item.metadata);
+	loadAudioAnalysis();
+	ensureLoopRunning();
 
 	// Event Listeners
 	Spicetify.Player.addEventListener("songchange", e => {
-		const preloadImage = new Image();
-		preloadImage.src = e.data.item.metadata.image_xlarge_url;
-		preloadImage.onload = () => {
-			setImage(preloadImage.src);
-		};
+		setImage(e.data.item.metadata);
+		loadAudioAnalysis();
+		ensureLoopRunning();
 	});
 })();

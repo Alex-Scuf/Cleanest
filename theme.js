@@ -98,7 +98,7 @@
       min: 100,
       max: 400,
       step: 10,
-      defVal: 160,
+      defVal: 250,
     },
     {
       id: "npv-ambience-reactive-smoothing",
@@ -888,10 +888,12 @@ const AMBIENCE_BLUR_PX = 15;        // blur amount, in px
 // been opened / if a variable somehow isn't set:
 const AMBIENCE_REACTIVE_MIN = 0.7;        // brightness multiplier during quiet parts
 const AMBIENCE_REACTIVE_MAX = 1.5;        // brightness multiplier at loudness peaks
-const AMBIENCE_REACTIVE_SIZE_MAX = 1.6;   // size multiplier at loudness peaks (independent of brightness)
+const AMBIENCE_REACTIVE_SIZE_MAX = 2.5;   // size multiplier at loudness peaks (independent of brightness)
 const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, lower = smoother
 
 // Append Styling To Head
+console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
+
 (function initStyle() {
 	const style = document.createElement("style");
 	style.textContent = `
@@ -908,28 +910,19 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 			content: "";
 			position: fixed;
 			pointer-events: none;
+			background-position: center;
+			background-size: cover;
 			background-repeat: no-repeat;
-			background-blend-mode: multiply;
 			transition: background 0.5s ease, opacity 0.5s ease;
 			opacity: var(--npv-ambience-opacity, 0);
 			z-index: 9999;
-			will-change: top, left, width, height, background-position;
 		}
 
-		.npv-ambience-glow-layer--saturate {
-			filter: blur(var(--npv-ambience-blur)) saturate(2) brightness(var(--npv-ambience-reactive-brightness, 1));
+		/* Single blurred/tinted layer per side (not stacked) — simple,
+		   direct, and known to actually show visible color. */
+		.npv-ambience-glow-layer--tint {
+			filter: blur(var(--npv-ambience-blur)) saturate(2.3) contrast(1.6) brightness(var(--npv-ambience-reactive-brightness, 1));
 		}
-
-		.npv-ambience-glow-layer--contrast {
-			filter: blur(var(--npv-ambience-blur)) contrast(2) brightness(var(--npv-ambience-reactive-brightness, 1));
-		}
-
-		/* NOTE: the fade to the outer edge is no longer done via mask-image
-		   (it never visibly worked in this environment after two attempts).
-		   Instead, setImage() below layers a white->black gradient (per
-		   side) UNDER the photo with background-blend-mode: multiply —
-		   white preserves the photo near the cover, black darkens it toward
-		   the outer edge, faking transparency without depending on mask. */
 
 		/* compatibility: since spotify 1.2.87; spicetify v2.42.2 */
 		.Root__right-sidebar aside .main-nowPlayingView-headerContainer {
@@ -1016,17 +1009,6 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 
 	const SIDES = ["top", "bottom", "left", "right"];
 
-	// Direction each side's "near cover -> outer edge" axis points in.
-	// Paired with background-blend-mode: multiply (white = no change,
-	// black = darken to nothing), this fakes the fade-to-transparent that
-	// mask-image was supposed to do.
-	const FADE_GRADIENT = {
-		top: "linear-gradient(to top, white, black)",
-		bottom: "linear-gradient(to bottom, white, black)",
-		left: "linear-gradient(to left, white, black)",
-		right: "linear-gradient(to right, white, black)",
-	};
-
 	// Create 4 thin "frame" strips per filter layer (top/bottom/left/right),
 	// attached directly to <body>. Because each strip only ever occupies the
 	// margin area around the cover art — never the cover art's own
@@ -1044,9 +1026,8 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 		return set;
 	}
 
-	const saturateLayers = makeLayerSet("npv-ambience-glow-layer--saturate");
-	const contrastLayers = makeLayerSet("npv-ambience-glow-layer--contrast");
-	const allLayers = [saturateLayers, contrastLayers];
+	const layers = makeLayerSet("npv-ambience-glow-layer--tint");
+	const allLayers = [layers];
 
 	// --- Reactive brightness state ---
 	let audioSegments = null;   // segments[] from Spicetify.getAudioData() — fallback source (overall loudness)
@@ -1180,12 +1161,10 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 		// blurred — a smaller source image stretched that far washes out
 		// into a flat, textureless smear instead of a soft colorful glow.
 		const url = metadata.image_xlarge_url || metadata.image_large_url || metadata.image_url;
+		const bg = `url(${url})`;
 		for (const layerSet of allLayers) {
 			for (const side of SIDES) {
-				// Two stacked background layers: the fade gradient (painted
-				// first, on top) and the actual photo underneath — combined
-				// via background-blend-mode: multiply set in CSS.
-				layerSet[side].style.backgroundImage = `${FADE_GRADIENT[side]}, url(${url})`;
+				layerSet[side].style.backgroundImage = bg;
 			}
 		}
 	}
@@ -1214,6 +1193,7 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 	let lastRectKey = "";
 	let lastWrittenBrightness = "";
 	let loopRunning = false;
+	let frameCounter = 0;
 
 	function syncPosition() {
 		const cover = document.querySelector(".main-nowPlayingView-coverArtContainer");
@@ -1235,7 +1215,7 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 		// size every beat looks jerky/twitchy, so it's deliberately damped
 		// to a fraction of the main smoothness setting rather than exposed
 		// as yet another slider.
-		const sizeSmoothing = Math.max(reactiveSmoothing * 0.35, 0.02);
+		const sizeSmoothing = Math.max(reactiveSmoothing * 0.6, 0.03);
 
 		// Compute the raw 0-1 "punch" strength once — brightness and size
 		// each map it through their own independent range below, so you can
@@ -1269,6 +1249,17 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 		const targetSizeMult = 1 + punchNorm * (reactiveSizeMax - 1);
 		smoothedSizeMult += (targetSizeMult - smoothedSizeMult) * sizeSmoothing;
 		const spread = Math.min(Math.max(baseSpread * smoothedSizeMult, 2), 200);
+
+		// The pulse math above stays smooth every frame (cheap), but the
+		// actual DOM writes below (geometry + background) are what's
+		// expensive — recalculating layout and repainting several blurred
+		// elements. Doing that at ~30fps instead of 60fps is imperceptible
+		// for this kind of ambient effect and roughly halves the cost.
+		frameCounter++;
+		if (frameCounter % 2 !== 0) {
+			requestAnimationFrame(syncPosition);
+			return;
+		}
 
 		const rect = cover.getBoundingClientRect();
 		const key = `${rect.top}|${rect.left}|${rect.width}|${rect.height}|${spread.toFixed(1)}`;

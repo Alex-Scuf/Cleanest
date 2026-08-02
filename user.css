@@ -3254,6 +3254,10 @@ display: none !important;
     background-color: #ffffff00;
 }
 
+.GenericModal__overlay > div[role="dialog"], .main-trackCreditsModal-container, .main-aboutRecsModal-container, .main-playlistEditDetailsModal-container, .profile-userEditDetails-container, .artist-artistAbout-modal, .bupRDM6tHHYnfPxEfQ_h, dialog.NiqTdDnFi5KAXoGukrdo.aOxbsZDBlepfQptv_EfI, dialog.jMkF9P0MOVAsPeHbK88D, dialog:has(.main-duplicateTrackModal-container), dialog:has(div > button[aria-label="Close"]) {
+    background-color: rgb(48 48 48 / 0%) !important;
+}
+
 
 
 

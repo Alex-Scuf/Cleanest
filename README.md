@@ -28,7 +28,7 @@ Since the cover art sits outside the sidebar boundaries, the glow can seamlessly
 You can adjust the glow's brightness and blur in Theme Settings. These are all the settings for now:
 </div>
 <p align=center>
-<img width="438" height="956" alt="preview4" src="https://github.com/user-attachments/assets/aa226c9a-c7b6-4b97-afcb-6804da59a17f" />
+  <img width="705" height="806" alt="Снимок экрана 2026-08-02 231917" src="https://github.com/user-attachments/assets/4755b96b-c739-493c-85ba-2a1f9c911400" />
 </p>
 <p align=center><b>More settings will be added in the future</b></p>
 

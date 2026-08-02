@@ -11,27 +11,40 @@
       id: "UseCustomBackground",
       name: "Custom background",
       defVal: false,
+      group: "theme",
     },
     {
       id: "UseCustomColor",
       name: "Custom color",
       defVal: false,
+      group: "theme",
     },
     {
       id: "HideNowPlayingSidebar",
       name: "Hide now playing sidebar",
       defVal: false,
+      group: "theme",
+    },
+    {
+      id: "AmbienceEnabled",
+      name: "Enable ambience glow",
+      defVal: true,
+      group: "ambience",
+      master: true,
     },
     {
       id: "AmbienceReactive",
       name: "Ambience reacts to music loudness",
       defVal: true,
+      group: "ambience",
+      animated: true,
     },
   ];
   const toggles = {
     UseCustomBackground: false,
     UseCustomColor: false,
     HideNowPlayingSidebar: false,
+    AmbienceEnabled: true,
     AmbienceReactive: true
   };
   const sliders = [
@@ -43,9 +56,10 @@
       step: 1,
       defVal: 15,
       end: "px",
+      group: "theme",
     },
-    { id: "cont", name: "Contrast", min: 0, max: 200, step: 2, defVal: 50 },
-    { id: "satu", name: "Saturation", min: 0, max: 200, step: 2, defVal: 70 },
+    { id: "cont", name: "Contrast", min: 0, max: 200, step: 2, defVal: 50, group: "theme" },
+    { id: "satu", name: "Saturation", min: 0, max: 200, step: 2, defVal: 70, group: "theme" },
     {
       id: "bright",
       name: "Brightness",
@@ -53,6 +67,7 @@
       max: 200,
       step: 2,
       defVal: 120,
+      group: "theme",
     },
     // Ambience glow (Now Playing View) — ids match the CSS custom property
     // names used further down (--npv-ambience-spread / --npv-ambience-blur),
@@ -66,6 +81,7 @@
       step: 1,
       defVal: 10,
       end: "px",
+      group: "ambience",
     },
     {
       id: "npv-ambience-blur",
@@ -75,22 +91,36 @@
       step: 1,
       defVal: 15,
       end: "px",
+      group: "ambience",
+    },
+    {
+      id: "npv-ambience-static-brightness",
+      name: "Static Brightness",
+      min: 20,
+      max: 400,
+      step: 10,
+      defVal: 100,
+      group: "ambience",
     },
     {
       id: "npv-ambience-reactive-min",
-      name: "Reactive Min Brightness",
+      name: "Min Brightness",
       min: 20,
       max: 100,
       step: 5,
       defVal: 70,
+      group: "ambience",
+      animated: true,
     },
     {
       id: "npv-ambience-reactive-max",
-      name: "Reactive Max Brightness",
+      name: "Max Brightness",
       min: 100,
       max: 300,
       step: 5,
-      defVal: 150,
+      defVal: 125,
+      group: "ambience",
+      animated: true,
     },
     {
       id: "npv-ambience-reactive-size-max",
@@ -99,6 +129,8 @@
       max: 400,
       step: 10,
       defVal: 250,
+      group: "ambience",
+      animated: true,
     },
     {
       id: "npv-ambience-reactive-smoothing",
@@ -107,6 +139,8 @@
       max: 100,
       step: 5,
       defVal: 25,
+      group: "ambience",
+      animated: true,
     },
   ];
 
@@ -558,6 +592,16 @@
     toggles.UseCustomColor = JSON.parse(localStorage.getItem("UseCustomColor"));
     toggles.HideNowPlayingSidebar = JSON.parse(localStorage.getItem("HideNowPlayingSidebar"));
 
+    // Master switch — defaults to ON (matches prior behavior for anyone who
+    // already has the glow configured). Turning this off disables the whole
+    // ambience glow, static and animated alike.
+    const storedEnabled = localStorage.getItem("AmbienceEnabled");
+    toggles.AmbienceEnabled = storedEnabled === null ? true : JSON.parse(storedEnabled);
+    document.documentElement.style.setProperty(
+      "--npv-ambience-master-enabled",
+      toggles.AmbienceEnabled ? 1 : 0
+    );
+
     // AmbienceReactive defaults to ON (unlike the others, which default to
     // off), so a missing localStorage entry (first run) must resolve to true.
     const storedReactive = localStorage.getItem("AmbienceReactive");
@@ -630,10 +674,12 @@
       </div>
     </div>`;
 
-    function createToggle(opt) {
-      let { id, name, defVal } = opt;
+    function createToggle(opt, container = content) {
+      let { id, name, defVal, group, master } = opt;
       const toggleRow = document.createElement("div");
       toggleRow.classList.add("cleanestOptionRow");
+      if (group) toggleRow.classList.add(`cleanest-group-${group}`);
+      if (group === "ambience" && !master) toggleRow.classList.add("cleanest-ambience-dependent");
       toggleRow.innerHTML = `
       <span class="cleanestOptionDesc">${name}:</span>
       <button class="cleanestOptionToggle">
@@ -644,19 +690,23 @@
       toggleRow.setAttribute("name", id);
       toggleRow
         .querySelector("button")
-        .addEventListener("click", () =>
-          toggleRow.querySelector(".toggle").classList.toggle("enabled")
-        );
+        .addEventListener("click", () => {
+          toggleRow.querySelector(".toggle").classList.toggle("enabled");
+          if (group === "ambience") updateAmbienceLock();
+        });
       const isEnabled = JSON.parse(localStorage.getItem(id)) ?? defVal;
       toggleRow.querySelector(".toggle").classList.toggle("enabled", isEnabled);
-      content.append(toggleRow);
+      container.append(toggleRow);
     }
 
-    function createSlider(opt) {
-      let { id, name, min, max, step, defVal, end } = opt;
+    function createSlider(opt, container = content) {
+      let { id, name, min, max, step, defVal, end, group, animated } = opt;
       const val = localStorage.getItem(`${id}Amount`) || defVal;
       const slider = document.createElement("div");
       slider.classList.add("cleanestOptionRow");
+      if (group) slider.classList.add(`cleanest-group-${group}`);
+      if (group === "ambience") slider.classList.add("cleanest-ambience-dependent");
+      if (animated) slider.classList.add("cleanest-ambience-animated");
       slider.innerHTML = `
       <div class="slider-container">
         <label for="${id}-input">${name}:</label>
@@ -680,7 +730,45 @@
           slider.querySelector(`#${id}-input`).value
         }${opt.end || "%"}`;
       });
-      content.append(slider);
+      container.append(slider);
+    }
+
+    function addSectionHeader(text, container = content) {
+      const header = document.createElement("div");
+      header.classList.add("cleanestSectionHeader");
+      header.textContent = text;
+      container.append(header);
+    }
+
+    function addSubHeader(text, container = content) {
+      const header = document.createElement("div");
+      header.classList.add("cleanestSubHeader", "cleanest-ambience-dependent");
+      header.textContent = text;
+      container.append(header);
+    }
+
+    // Greys out (and actually disables, not just visually) every ambience
+    // setting — static and animated alike — while "Enable ambience glow"
+    // is off, live as the checkbox is clicked, before Apply is even hit.
+    function updateAmbienceLock() {
+      const masterOn = content
+        .querySelector('.cleanestOptionRow[name="AmbienceEnabled"] .toggle')
+        ?.classList.contains("enabled");
+      const reactiveOn = content
+        .querySelector('.cleanestOptionRow[name="AmbienceReactive"] .toggle')
+        ?.classList.contains("enabled");
+
+      content.querySelectorAll(".cleanest-ambience-dependent").forEach((row) => {
+        // Animated rows need BOTH the master switch and "reacts to music
+        // loudness" itself to be on; plain ambience rows only need master.
+        const isAnimated = row.classList.contains("cleanest-ambience-animated");
+        const shouldEnable = isAnimated ? masterOn && reactiveOn : masterOn;
+        row.classList.toggle("cleanest-disabled", !shouldEnable);
+        row.querySelectorAll("input, button").forEach((el) => (el.disabled = !shouldEnable));
+        row.querySelectorAll("[contenteditable]").forEach((el) => {
+          el.contentEditable = shouldEnable ? "true" : "false";
+        });
+      });
     }
 
     const srcInput = document.createElement("input");
@@ -697,11 +785,21 @@
     }
     content.append(srcInput);
 
-    toggleInfo.forEach(createToggle);
+    const columnsWrapper = document.createElement("div");
+    columnsWrapper.classList.add("cleanestSettingsColumns");
+    const themeColumn = document.createElement("div");
+    themeColumn.classList.add("cleanestSettingsColumn");
+    const ambienceColumn = document.createElement("div");
+    ambienceColumn.classList.add("cleanestSettingsColumn");
+
+    addSectionHeader("Theme", themeColumn);
+    toggleInfo
+      .filter((opt) => opt.group === "theme")
+      .forEach((opt) => createToggle(opt, themeColumn));
 
     // Additional settings (added by lily)
     const colorRow = document.createElement("div");
-    colorRow.classList.add("cleanestOptionRow");
+    colorRow.classList.add("cleanestOptionRow", "cleanest-group-theme");
 
     // Color label
     const colorLabel = document.createElement("label");
@@ -720,10 +818,34 @@
     colorInput.value = localStorage.getItem("CustomColor") || "#30bf63";
     colorInput.style.border = "none";
     colorRow.append(colorInput);
-    content.append(colorRow);
+    themeColumn.append(colorRow);
 
-    sliders.forEach(createSlider);
+    sliders
+      .filter((opt) => opt.group === "theme")
+      .forEach((opt) => createSlider(opt, themeColumn));
+
+    addSectionHeader("Ambience Glow", ambienceColumn);
+    // Master switch first, un-gated, so it's always usable.
+    toggleInfo.filter((opt) => opt.master).forEach((opt) => createToggle(opt, ambienceColumn));
+
+    addSubHeader("Static", ambienceColumn);
+    sliders
+      .filter((opt) => opt.group === "ambience" && !opt.animated)
+      .forEach((opt) => createSlider(opt, ambienceColumn));
+
+    addSubHeader("Animated", ambienceColumn);
+    toggleInfo
+      .filter((opt) => opt.group === "ambience" && opt.animated)
+      .forEach((opt) => createToggle(opt, ambienceColumn));
+    sliders
+      .filter((opt) => opt.animated)
+      .forEach((opt) => createSlider(opt, ambienceColumn));
+
+    columnsWrapper.append(themeColumn, ambienceColumn);
+    content.append(columnsWrapper);
+
     loadSliders();
+    updateAmbienceLock();
 
     img = content.querySelector("img");
     img.src = localStorage.getItem("cleanest:startupBg") || defImage;
@@ -886,8 +1008,9 @@ const AMBIENCE_BLUR_PX = 15;        // blur amount, in px
 // music loudness" toggle in the settings menu (see toggleInfo above) —
 // these three are just the fallback values used before the menu has ever
 // been opened / if a variable somehow isn't set:
+const AMBIENCE_STATIC_BRIGHTNESS = 1;     // brightness multiplier when reactive mode is off
 const AMBIENCE_REACTIVE_MIN = 0.7;        // brightness multiplier during quiet parts
-const AMBIENCE_REACTIVE_MAX = 1.5;        // brightness multiplier at loudness peaks
+const AMBIENCE_REACTIVE_MAX = 1.25;       // brightness multiplier at loudness peaks
 const AMBIENCE_REACTIVE_SIZE_MAX = 2.5;   // size multiplier at loudness peaks (independent of brightness)
 const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, lower = smoother
 
@@ -901,6 +1024,64 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			--npv-ambience-spread: ${AMBIENCE_SPREAD_PX}px;
 			--npv-ambience-blur: ${AMBIENCE_BLUR_PX}px;
 			--npv-ambience-reactive-brightness: 1;
+		}
+
+		/* Cleanest Settings modal: section headers + the "greyed out while
+		   disabled" state for ambience-dependent rows. Bundled into this
+		   same injected stylesheet since it's the only one this theme sets
+		   up — nothing to do with the glow itself. */
+		.cleanestSectionHeader {
+			font-size: 1rem;
+			font-weight: 700;
+			margin-top: 18px;
+			margin-bottom: 4px;
+			padding-bottom: 4px;
+			border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+		}
+		.cleanestSubHeader {
+			font-size: 0.75rem;
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			opacity: 0.6;
+			margin-top: 10px;
+		}
+		.cleanestOptionRow.cleanest-disabled {
+			opacity: 0.4;
+			pointer-events: none;
+		}
+
+		/* Widen the settings modal itself and lay Theme / Ambience Glow out
+		   side by side instead of one long vertical list. Scoped to this
+		   specific modal via its aria-label so nothing else in the app is
+		   affected. */
+		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-container {
+			width: 720px !important;
+			max-width: 92vw !important;
+		}
+		.cleanestSettingsColumns {
+			display: flex;
+			gap: 32px;
+			align-items: flex-start;
+			margin-top: 4px;
+		}
+		.cleanestSettingsColumn {
+			flex: 1 1 0;
+			min-width: 0;
+		}
+		.cleanestSettingsColumn .cleanestSectionHeader {
+			margin-top: 0;
+		}
+		/* Modal title — Spicetify renders this itself (not part of our
+		   content object), so it's centered purely via CSS, scoped to this
+		   one modal by its aria-label. Targets any heading tag, plus flex:1
+		   as a fallback in case the title sits in a flex row next to the
+		   close button (so text-align has room to actually center within). */
+		div[aria-label="Cleanest Settings"] h1,
+		div[aria-label="Cleanest Settings"] h2 {
+			width: 100%;
+			flex: 1;
+			text-align: center;
 		}
 
 		/* Real elements attached to <body> (not inside the sidebar's DOM
@@ -1197,7 +1378,9 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 
 	function syncPosition() {
 		const cover = document.querySelector(".main-nowPlayingView-coverArtContainer");
-		if (!cover) {
+		const masterEnabled = getComputedStyle(document.documentElement)
+			.getPropertyValue("--npv-ambience-master-enabled").trim() !== "0";
+		if (!cover || !masterEnabled) {
 			loopRunning = false;
 			document.documentElement.style.setProperty("--npv-ambience-opacity", 0);
 			return; // don't reschedule — a cheap low-frequency check wakes this back up
@@ -1206,6 +1389,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		const rootStyle = getComputedStyle(document.documentElement);
 		const baseSpread = Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-spread")) || AMBIENCE_SPREAD_PX;
 		const reactiveEnabled = rootStyle.getPropertyValue("--npv-ambience-reactive-enabled").trim() !== "0";
+		const staticBrightness = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-static-brightness")) || AMBIENCE_STATIC_BRIGHTNESS * 100) / 100;
 		const reactiveMin = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-min")) || AMBIENCE_REACTIVE_MIN * 100) / 100;
 		const reactiveMax = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-max")) || AMBIENCE_REACTIVE_MAX * 100) / 100;
 		const reactiveSizeMax = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-size-max")) || AMBIENCE_REACTIVE_SIZE_MAX * 100) / 100;
@@ -1236,7 +1420,13 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			}
 		}
 
-		const targetBrightness = reactiveMin + punchNorm * (reactiveMax - reactiveMin);
+		// Static Brightness and Reactive Min/Max are now fully independent —
+		// with reactive off (or no analysis for this track), brightness is
+		// just Static Brightness; Reactive Min/Max only ever apply while
+		// actually reacting, and no longer leak into the non-reactive look.
+		const targetBrightness = reactiveEnabled
+			? reactiveMin + punchNorm * (reactiveMax - reactiveMin)
+			: staticBrightness;
 		smoothedBrightness += (targetBrightness - smoothedBrightness) * reactiveSmoothing;
 		const roundedBrightness = smoothedBrightness.toFixed(3);
 		if (roundedBrightness !== lastWrittenBrightness) {
@@ -1271,6 +1461,13 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			const outerTop = rect.top - spread;
 			const bgSize = `${outerW}px ${outerH}px`;
 
+			// Full-length windowing, sampling a thin strip along the whole
+			// edge (not just a corner) — this correctly picks up gradients,
+			// beams, or vignettes that run through the middle of an edge
+			// (common in album art) rather than only the corners. A design
+			// that bulges close to the edge exactly at the midpoint (e.g. a
+			// large centered circle) can occasionally bleed in — a rarer
+			// tradeoff than losing legitimate edge-center color entirely.
 			const bands = {
 				top:    { left: outerLeft, top: outerTop, width: outerW, height: spread, bgX: 0, bgY: 0 },
 				bottom: { left: outerLeft, top: rect.bottom, width: outerW, height: spread, bgX: 0, bgY: -(outerH - spread) },
@@ -1286,8 +1483,8 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 					el.style.left = `${b.left}px`;
 					el.style.width = `${b.width}px`;
 					el.style.height = `${b.height}px`;
-					el.style.backgroundSize = `100% 100%, ${bgSize}`;
-					el.style.backgroundPosition = `0 0, ${b.bgX}px ${b.bgY}px`;
+					el.style.backgroundSize = bgSize;
+					el.style.backgroundPosition = `${b.bgX}px ${b.bgY}px`;
 				}
 			}
 		}
@@ -1299,6 +1496,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 	function ensureLoopRunning() {
 		if (loopRunning) return;
 		if (!document.querySelector(".main-nowPlayingView-coverArtContainer")) return;
+		if (getComputedStyle(document.documentElement).getPropertyValue("--npv-ambience-master-enabled").trim() === "0") return;
 		loopRunning = true;
 		requestAnimationFrame(syncPosition);
 	}

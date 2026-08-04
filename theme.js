@@ -39,13 +39,29 @@
       group: "ambience",
       animated: true,
     },
+    {
+      id: "EdgeGlowEnabled",
+      name: "Enable screen edge glow",
+      defVal: true,
+      group: "edgeglow",
+      master: true,
+    },
+    {
+      id: "EdgeGlowReactive",
+      name: "Edge glow reacts to music loudness",
+      defVal: true,
+      group: "edgeglow",
+      animated: true,
+    },
   ];
   const toggles = {
     UseCustomBackground: false,
     UseCustomColor: false,
     HideNowPlayingSidebar: false,
     AmbienceEnabled: true,
-    AmbienceReactive: true
+    AmbienceReactive: true,
+    EdgeGlowEnabled: true,
+    EdgeGlowReactive: true
   };
   const sliders = [
     {
@@ -140,6 +156,45 @@
       step: 5,
       defVal: 25,
       group: "ambience",
+      animated: true,
+    },
+    {
+      id: "npv-edge-glow-size",
+      name: "Edge Glow Size",
+      min: 20,
+      max: 300,
+      step: 10,
+      defVal: 100,
+      end: "px",
+      group: "edgeglow",
+    },
+    {
+      id: "npv-edge-glow-blur",
+      name: "Edge Glow Blur",
+      min: 0,
+      max: 100,
+      step: 5,
+      defVal: 40,
+      end: "px",
+      group: "edgeglow",
+    },
+    {
+      id: "npv-edge-glow-opacity",
+      name: "Edge Glow Opacity",
+      min: 5,
+      max: 100,
+      step: 5,
+      defVal: 30,
+      group: "edgeglow",
+    },
+    {
+      id: "npv-edge-glow-reactive-boost",
+      name: "Edge Glow Reactive Boost",
+      min: 100,
+      max: 400,
+      step: 10,
+      defVal: 200,
+      group: "edgeglow",
       animated: true,
     },
   ];
@@ -615,6 +670,20 @@
       toggles.AmbienceReactive ? 1 : 0
     );
 
+    const storedEdgeGlow = localStorage.getItem("EdgeGlowEnabled");
+    toggles.EdgeGlowEnabled = storedEdgeGlow === null ? true : JSON.parse(storedEdgeGlow);
+    document.documentElement.style.setProperty(
+      "--npv-edge-glow-enabled",
+      toggles.EdgeGlowEnabled ? 1 : 0
+    );
+
+    const storedEdgeReactive = localStorage.getItem("EdgeGlowReactive");
+    toggles.EdgeGlowReactive = storedEdgeReactive === null ? true : JSON.parse(storedEdgeReactive);
+    document.documentElement.style.setProperty(
+      "--npv-edge-glow-reactive-enabled",
+      toggles.EdgeGlowReactive ? 1 : 0
+    );
+
     if (toggles.HideNowPlayingSidebar) {
       document.body.classList.add("__cleanest_hidenowplayingsidebar");
     }
@@ -674,12 +743,25 @@
       </div>
     </div>`;
 
+    // Maps a settings group to the id of its master on/off toggle, so the
+    // lock logic below works for any group (Ambience, Edge Glow, future
+    // ones) instead of being hardcoded to just one.
+    const GROUP_MASTERS = { ambience: "AmbienceEnabled", edgeglow: "EdgeGlowEnabled" };
+    // Same idea, but for each group's own "reacts to music" sub-toggle —
+    // "Animated" rows within a group need BOTH switches on, not just master.
+    const GROUP_REACTIVE = { ambience: "AmbienceReactive", edgeglow: "EdgeGlowReactive" };
+
     function createToggle(opt, container = content) {
-      let { id, name, defVal, group, master } = opt;
+      let { id, name, defVal, group, master, animated } = opt;
       const toggleRow = document.createElement("div");
       toggleRow.classList.add("cleanestOptionRow");
       if (group) toggleRow.classList.add(`cleanest-group-${group}`);
-      if (group === "ambience" && !master) toggleRow.classList.add("cleanest-ambience-dependent");
+      if (group && !master) toggleRow.classList.add(`cleanest-${group}-dependent`);
+      // Note: "animated" is intentionally NOT applied here for toggles —
+      // only to sliders (below). If the group's own "reacts to music"
+      // toggle marked itself as animated, it would need itself to already
+      // be on in order to be clickable — a permanent lockout the moment
+      // it's off.
       toggleRow.innerHTML = `
       <span class="cleanestOptionDesc">${name}:</span>
       <button class="cleanestOptionToggle">
@@ -692,7 +774,7 @@
         .querySelector("button")
         .addEventListener("click", () => {
           toggleRow.querySelector(".toggle").classList.toggle("enabled");
-          if (group === "ambience") updateAmbienceLock();
+          if (group in GROUP_MASTERS) updateSettingsLocks();
         });
       const isEnabled = JSON.parse(localStorage.getItem(id)) ?? defVal;
       toggleRow.querySelector(".toggle").classList.toggle("enabled", isEnabled);
@@ -704,9 +786,8 @@
       const val = localStorage.getItem(`${id}Amount`) || defVal;
       const slider = document.createElement("div");
       slider.classList.add("cleanestOptionRow");
-      if (group) slider.classList.add(`cleanest-group-${group}`);
-      if (group === "ambience") slider.classList.add("cleanest-ambience-dependent");
-      if (animated) slider.classList.add("cleanest-ambience-animated");
+      if (group) slider.classList.add(`cleanest-group-${group}`, `cleanest-${group}-dependent`);
+      if (group && animated) slider.classList.add(`cleanest-${group}-animated`);
       slider.innerHTML = `
       <div class="slider-container">
         <label for="${id}-input">${name}:</label>
@@ -740,35 +821,39 @@
       container.append(header);
     }
 
-    function addSubHeader(text, container = content) {
+    function addSubHeader(text, container = content, group = "ambience") {
       const header = document.createElement("div");
-      header.classList.add("cleanestSubHeader", "cleanest-ambience-dependent");
+      header.classList.add("cleanestSubHeader", `cleanest-${group}-dependent`);
       header.textContent = text;
       container.append(header);
     }
 
-    // Greys out (and actually disables, not just visually) every ambience
-    // setting — static and animated alike — while "Enable ambience glow"
-    // is off, live as the checkbox is clicked, before Apply is even hit.
-    function updateAmbienceLock() {
-      const masterOn = content
-        .querySelector('.cleanestOptionRow[name="AmbienceEnabled"] .toggle')
-        ?.classList.contains("enabled");
-      const reactiveOn = content
-        .querySelector('.cleanestOptionRow[name="AmbienceReactive"] .toggle')
-        ?.classList.contains("enabled");
+    // Greys out (and actually disables, not just visually) every setting
+    // belonging to a group whose master switch is off — live as the
+    // checkbox is clicked, before Apply is even hit. Works for any group
+    // listed in GROUP_MASTERS, not just Ambience.
+    function updateSettingsLocks() {
+      for (const [group, masterId] of Object.entries(GROUP_MASTERS)) {
+        const masterOn = content
+          .querySelector(`.cleanestOptionRow[name="${masterId}"] .toggle`)
+          ?.classList.contains("enabled");
+        const reactiveId = GROUP_REACTIVE[group];
+        const reactiveOn = reactiveId
+          ? content.querySelector(`.cleanestOptionRow[name="${reactiveId}"] .toggle`)?.classList.contains("enabled")
+          : true;
 
-      content.querySelectorAll(".cleanest-ambience-dependent").forEach((row) => {
-        // Animated rows need BOTH the master switch and "reacts to music
-        // loudness" itself to be on; plain ambience rows only need master.
-        const isAnimated = row.classList.contains("cleanest-ambience-animated");
-        const shouldEnable = isAnimated ? masterOn && reactiveOn : masterOn;
-        row.classList.toggle("cleanest-disabled", !shouldEnable);
-        row.querySelectorAll("input, button").forEach((el) => (el.disabled = !shouldEnable));
-        row.querySelectorAll("[contenteditable]").forEach((el) => {
-          el.contentEditable = shouldEnable ? "true" : "false";
+        content.querySelectorAll(`.cleanest-${group}-dependent`).forEach((row) => {
+          // "Animated" rows within a group additionally need that group's
+          // own "reacts to music" toggle on, not just the group's master.
+          const isAnimated = row.classList.contains(`cleanest-${group}-animated`);
+          const shouldEnable = isAnimated ? masterOn && reactiveOn : masterOn;
+          // Just the one class toggle — it carries both pointer-events:none
+          // (blocks interaction) and the greyed-out look via CSS. Also
+          // setting the native `disabled`/contentEditable on every input
+          // here was noticeably janky when many rows toggled at once.
+          row.classList.toggle("cleanest-disabled", !shouldEnable);
         });
-      });
+      }
     }
 
     const srcInput = document.createElement("input");
@@ -791,6 +876,8 @@
     themeColumn.classList.add("cleanestSettingsColumn");
     const ambienceColumn = document.createElement("div");
     ambienceColumn.classList.add("cleanestSettingsColumn");
+    const edgeGlowColumn = document.createElement("div");
+    edgeGlowColumn.classList.add("cleanestSettingsColumn");
 
     addSectionHeader("Theme", themeColumn);
     toggleInfo
@@ -826,26 +913,47 @@
 
     addSectionHeader("Ambience Glow", ambienceColumn);
     // Master switch first, un-gated, so it's always usable.
-    toggleInfo.filter((opt) => opt.master).forEach((opt) => createToggle(opt, ambienceColumn));
+    toggleInfo
+      .filter((opt) => opt.master && opt.group === "ambience")
+      .forEach((opt) => createToggle(opt, ambienceColumn));
 
-    addSubHeader("Static", ambienceColumn);
+    addSubHeader("Static", ambienceColumn, "ambience");
     sliders
       .filter((opt) => opt.group === "ambience" && !opt.animated)
       .forEach((opt) => createSlider(opt, ambienceColumn));
 
-    addSubHeader("Animated", ambienceColumn);
+    addSubHeader("Animated", ambienceColumn, "ambience");
     toggleInfo
       .filter((opt) => opt.group === "ambience" && opt.animated)
       .forEach((opt) => createToggle(opt, ambienceColumn));
     sliders
-      .filter((opt) => opt.animated)
+      .filter((opt) => opt.group === "ambience" && opt.animated)
       .forEach((opt) => createSlider(opt, ambienceColumn));
 
-    columnsWrapper.append(themeColumn, ambienceColumn);
+    addSectionHeader("Edge Glow", edgeGlowColumn);
+    // Color comes from the theme's own dynamic accent (var(--spice-accent)
+    // — the same variable the liked-songs heart icon uses), not the cover
+    // art, so there's no color-related setting here, just size/blur/opacity.
+    toggleInfo
+      .filter((opt) => opt.master && opt.group === "edgeglow")
+      .forEach((opt) => createToggle(opt, edgeGlowColumn));
+    sliders
+      .filter((opt) => opt.group === "edgeglow" && !opt.animated)
+      .forEach((opt) => createSlider(opt, edgeGlowColumn));
+
+    addSubHeader("Animated", edgeGlowColumn, "edgeglow");
+    toggleInfo
+      .filter((opt) => opt.group === "edgeglow" && opt.animated)
+      .forEach((opt) => createToggle(opt, edgeGlowColumn));
+    sliders
+      .filter((opt) => opt.group === "edgeglow" && opt.animated)
+      .forEach((opt) => createSlider(opt, edgeGlowColumn));
+
+    columnsWrapper.append(themeColumn, ambienceColumn, edgeGlowColumn);
     content.append(columnsWrapper);
 
     loadSliders();
-    updateAmbienceLock();
+    updateSettingsLocks();
 
     img = content.querySelector("img");
     img.src = localStorage.getItem("cleanest:startupBg") || defImage;
@@ -1056,8 +1164,8 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		   specific modal via its aria-label so nothing else in the app is
 		   affected. */
 		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-container {
-			width: 720px !important;
-			max-width: 92vw !important;
+			width: 960px !important;
+			max-width: 95vw !important;
 		}
 		.cleanestSettingsColumns {
 			display: flex;
@@ -1072,16 +1180,77 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		.cleanestSettingsColumn .cleanestSectionHeader {
 			margin-top: 0;
 		}
+		/* Long slider labels ("Ambience Spread", "Reactive Smoothness", "Edge
+		   Glow Opacity"...) were wrapping to 2 lines and breaking alignment
+		   in the narrower 3-column layout. Giving the label its own full row
+		   makes wrapping harmless instead of fighting the slider for space. */
+		.cleanestSettingsColumn .slider-container {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+		}
+		.cleanestSettingsColumn .slider-container label {
+			flex: 1 1 100%;
+			text-align: left;
+			margin-right: 0;
+			margin-bottom: 4px;
+			white-space: normal;
+		}
+		.cleanestSettingsColumn .slider-container input.slider {
+			flex: 1 1 auto;
+			max-width: 65%;
+		}
+		.cleanestSettingsColumn .slider-container .slider-value {
+			flex: 0 0 auto;
+		}
 		/* Modal title — Spicetify renders this itself (not part of our
 		   content object), so it's centered purely via CSS, scoped to this
 		   one modal by its aria-label. Targets any heading tag, plus flex:1
 		   as a fallback in case the title sits in a flex row next to the
 		   close button (so text-align has room to actually center within). */
-		div[aria-label="Cleanest Settings"] h1,
-		div[aria-label="Cleanest Settings"] h2 {
-			width: 100%;
-			flex: 1;
-			text-align: center;
+		/* Title centering was removed here after repeated attempts kept
+		   interfering with the close button's clickable area in ways I
+		   couldn't verify without live DevTools access — a working close
+		   button matters more than a centered title. If you still want it
+		   centered, grab the title element's actual class/structure from
+		   DevTools and I can target it precisely instead of guessing. */
+
+		/* Screen edge glow: colored by the theme's own dynamic accent
+		   (var(--spice-accent) — same variable the liked-songs heart uses),
+		   not the cover art. Pure CSS — no JS polling needed, since Spicetify
+		   itself keeps --spice-accent updated whenever it changes.
+		   Deliberately kept BEHIND the app's own UI (low z-index) rather than
+		   on top of it, so it reads as light bleeding in around the edges
+		   through this theme's translucent panels, instead of a bright wash
+		   sitting over the sidebar/player controls. */
+		.npv-edge-glow {
+			position: fixed;
+			pointer-events: none;
+			z-index: 999999;
+			filter: blur(var(--npv-edge-glow-blur, 40px)) brightness(var(--npv-edge-glow-reactive-brightness, 1));
+			opacity: calc(var(--npv-edge-glow-enabled, 1) * var(--npv-edge-glow-opacity, 0.3));
+			transition: opacity 0.4s ease, background 0.4s ease;
+		}
+		.npv-edge-glow--left {
+			top: 0;
+			left: 0;
+			bottom: 0;
+			width: var(--npv-edge-glow-size, 100px);
+			background: linear-gradient(to right, var(--spice-accent, #1db954), transparent);
+		}
+		.npv-edge-glow--top {
+			top: 0;
+			left: 0;
+			right: 0;
+			height: var(--npv-edge-glow-size, 100px);
+			background: linear-gradient(to bottom, var(--spice-accent, #1db954), transparent);
+		}
+		.npv-edge-glow--bottom {
+			bottom: 0;
+			left: 0;
+			right: 0;
+			height: var(--npv-edge-glow-size, 100px);
+			background: linear-gradient(to top, var(--spice-accent, #1db954), transparent);
 		}
 
 		/* Real elements attached to <body> (not inside the sidebar's DOM
@@ -1179,6 +1348,18 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		}
 	`;
 	document.head.appendChild(style);
+})();
+
+// Screen edge glow — three simple elements, created once. No per-frame JS
+// needed at all: color comes from var(--spice-accent), which Spicetify
+// itself keeps updated, and size/blur/opacity are plain CSS custom
+// properties driven by the settings menu.
+(function edgeGlow() {
+	for (const side of ["left", "top", "bottom"]) {
+		const el = document.createElement("div");
+		el.className = `npv-edge-glow npv-edge-glow--${side}`;
+		document.body.appendChild(el);
+	}
 })();
 
 (function npvAmbience() {
@@ -1371,22 +1552,56 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		return (data.positionAsOfTimestamp || 0) + (Date.now() - (data.timestamp || Date.now()));
 	}
 
+	// Edge glow's pulse state (always active — this effect isn't gated on
+	// Now Playing View's cover art existing).
+	let edgeGlowSmoothed = 1;
+
 	let lastRectKey = "";
 	let lastWrittenBrightness = "";
-	let loopRunning = false;
 	let frameCounter = 0;
 
-	function syncPosition() {
+	// Single combined loop for both effects. They used to be two separate
+	// requestAnimationFrame loops, each independently calling
+	// getComputedStyle() and writing to the DOM — when both ran at once,
+	// their reads/writes interleaved within the same frame, forcing the
+	// browser to recalculate style more than once per frame ("layout
+	// thrashing"). One shared read + one shared write pass per frame fixes
+	// that regardless of how many effects are active at once.
+	function masterLoop() {
+		const rootStyle = getComputedStyle(document.documentElement);
+		const posSec = getPrecisePositionMs() / 1000;
+
+		// --- Edge glow: cheap, always runs regardless of NPV state ---
+		const edgeEnabled = rootStyle.getPropertyValue("--npv-edge-glow-enabled").trim() !== "0";
+		const edgeReactive = rootStyle.getPropertyValue("--npv-edge-glow-reactive-enabled").trim() !== "0";
+		let edgeTarget = 1;
+		if (edgeEnabled && edgeReactive) {
+			const punch = getBeatPunch(posSec);
+			let norm = 0;
+			if (punch !== null) {
+				norm = Math.min(punch, 1);
+			} else if (audioSegments) {
+				const db = getSegmentLoudnessDb(posSec);
+				if (db !== null) {
+					norm = Math.min(Math.max((db - loudnessFloor) / (loudnessCeil - loudnessFloor), 0), 1);
+				}
+			}
+			const boost = (Number.parseFloat(rootStyle.getPropertyValue("--npv-edge-glow-reactive-boost")) || 200) / 100;
+			edgeTarget = 1 + norm * (boost - 1);
+		}
+		edgeGlowSmoothed += (edgeTarget - edgeGlowSmoothed) * 0.15;
+		document.documentElement.style.setProperty("--npv-edge-glow-reactive-brightness", edgeGlowSmoothed.toFixed(3));
+
+		// --- Cover art ambience glow: only while NPV's cover art exists ---
 		const cover = document.querySelector(".main-nowPlayingView-coverArtContainer");
-		const masterEnabled = getComputedStyle(document.documentElement)
-			.getPropertyValue("--npv-ambience-master-enabled").trim() !== "0";
+		const masterEnabled = rootStyle.getPropertyValue("--npv-ambience-master-enabled").trim() !== "0";
+
 		if (!cover || !masterEnabled) {
-			loopRunning = false;
 			document.documentElement.style.setProperty("--npv-ambience-opacity", 0);
-			return; // don't reschedule — a cheap low-frequency check wakes this back up
+			requestAnimationFrame(masterLoop);
+			return;
 		}
 
-		const rootStyle = getComputedStyle(document.documentElement);
 		const baseSpread = Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-spread")) || AMBIENCE_SPREAD_PX;
 		const reactiveEnabled = rootStyle.getPropertyValue("--npv-ambience-reactive-enabled").trim() !== "0";
 		const staticBrightness = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-static-brightness")) || AMBIENCE_STATIC_BRIGHTNESS * 100) / 100;
@@ -1394,25 +1609,14 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		const reactiveMax = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-max")) || AMBIENCE_REACTIVE_MAX * 100) / 100;
 		const reactiveSizeMax = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-size-max")) || AMBIENCE_REACTIVE_SIZE_MAX * 100) / 100;
 		const reactiveSmoothing = Math.min(Math.max((Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-smoothing")) || AMBIENCE_REACTIVE_SMOOTHING * 100) / 100, 0.01), 1);
-		// Size always eases noticeably slower than brightness by default —
-		// snappy brightness flashes read as punchy, but snapping the actual
-		// size every beat looks jerky/twitchy, so it's deliberately damped
-		// to a fraction of the main smoothness setting rather than exposed
-		// as yet another slider.
 		const sizeSmoothing = Math.max(reactiveSmoothing * 0.6, 0.03);
 
-		// Compute the raw 0-1 "punch" strength once — brightness and size
-		// each map it through their own independent range below, so you can
-		// have a subtle brightness flash with a big size swell, or vice versa.
 		let punchNorm = 0;
 		if (reactiveEnabled) {
-			const posSec = getPrecisePositionMs() / 1000;
 			const punch = getBeatPunch(posSec);
 			if (punch !== null) {
-				// Beat-synced flash — the "reacts to the bass/kick" behavior.
 				punchNorm = Math.min(punch, 1);
 			} else if (audioSegments) {
-				// No beat data for this track — fall back to overall loudness.
 				const db = getSegmentLoudnessDb(posSec);
 				if (db !== null) {
 					punchNorm = Math.min(Math.max((db - loudnessFloor) / (loudnessCeil - loudnessFloor), 0), 1);
@@ -1420,10 +1624,6 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			}
 		}
 
-		// Static Brightness and Reactive Min/Max are now fully independent —
-		// with reactive off (or no analysis for this track), brightness is
-		// just Static Brightness; Reactive Min/Max only ever apply while
-		// actually reacting, and no longer leak into the non-reactive look.
 		const targetBrightness = reactiveEnabled
 			? reactiveMin + punchNorm * (reactiveMax - reactiveMin)
 			: staticBrightness;
@@ -1434,20 +1634,15 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			document.documentElement.style.setProperty("--npv-ambience-reactive-brightness", roundedBrightness);
 		}
 
-		// Size pulses independently, with its own (gentler) easing — grows
-		// from the base Spread up toward Bass Size Boost at full punch.
 		const targetSizeMult = 1 + punchNorm * (reactiveSizeMax - 1);
 		smoothedSizeMult += (targetSizeMult - smoothedSizeMult) * sizeSmoothing;
 		const spread = Math.min(Math.max(baseSpread * smoothedSizeMult, 2), 200);
 
-		// The pulse math above stays smooth every frame (cheap), but the
-		// actual DOM writes below (geometry + background) are what's
-		// expensive — recalculating layout and repainting several blurred
-		// elements. Doing that at ~30fps instead of 60fps is imperceptible
-		// for this kind of ambient effect and roughly halves the cost.
+		// Geometry/background writes stay throttled to ~30fps — still the
+		// expensive part (layout + repainting several blurred elements).
 		frameCounter++;
 		if (frameCounter % 2 !== 0) {
-			requestAnimationFrame(syncPosition);
+			requestAnimationFrame(masterLoop);
 			return;
 		}
 
@@ -1461,13 +1656,6 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			const outerTop = rect.top - spread;
 			const bgSize = `${outerW}px ${outerH}px`;
 
-			// Full-length windowing, sampling a thin strip along the whole
-			// edge (not just a corner) — this correctly picks up gradients,
-			// beams, or vignettes that run through the middle of an edge
-			// (common in album art) rather than only the corners. A design
-			// that bulges close to the edge exactly at the midpoint (e.g. a
-			// large centered circle) can occasionally bleed in — a rarer
-			// tradeoff than losing legitimate edge-center color entirely.
 			const bands = {
 				top:    { left: outerLeft, top: outerTop, width: outerW, height: spread, bgX: 0, bgY: 0 },
 				bottom: { left: outerLeft, top: rect.bottom, width: outerW, height: spread, bgX: 0, bgY: -(outerH - spread) },
@@ -1490,32 +1678,17 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		}
 		document.documentElement.style.setProperty("--npv-ambience-opacity", rect.width > 0 ? 1 : 0);
 
-		requestAnimationFrame(syncPosition);
+		requestAnimationFrame(masterLoop);
 	}
-
-	function ensureLoopRunning() {
-		if (loopRunning) return;
-		if (!document.querySelector(".main-nowPlayingView-coverArtContainer")) return;
-		if (getComputedStyle(document.documentElement).getPropertyValue("--npv-ambience-master-enabled").trim() === "0") return;
-		loopRunning = true;
-		requestAnimationFrame(syncPosition);
-	}
-
-	// Cheap, infrequent check (2x/sec) for whether Now Playing View's cover
-	// art has appeared — this is what (re)starts the real per-frame loop
-	// above, and is what lets it fully stop (no timers, no listeners, no
-	// work at all) while NPV is closed.
-	setInterval(ensureLoopRunning, 500);
 
 	// Initialization
 	setImage(Spicetify.Player.data.item.metadata);
 	loadAudioAnalysis();
-	ensureLoopRunning();
+	requestAnimationFrame(masterLoop);
 
 	// Event Listeners
 	Spicetify.Player.addEventListener("songchange", e => {
 		setImage(e.data.item.metadata);
 		loadAudioAnalysis();
-		ensureLoopRunning();
 	});
 })();

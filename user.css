@@ -3052,27 +3052,27 @@ body.__cleanest_hidenowplayingsidebar .Root__top-container:has(.Root__right-side
 
 
 
-[aria-label='Listening activity'] {display:none!important;}
+/* moved to theme.js toggle (Elements settings): [aria-label='Listening activity'] {display:none!important;} */
 
-[aria-label='Lyrics'] {display:none!important;}
+/* moved to theme.js toggle (Elements settings): [aria-label='Lyrics'] {display:none!important;} */
 
-[aria-label="Looks like we don't have the lyrics for this song."] {display:none!important;}
+/* moved to theme.js toggle (Elements settings): [aria-label="Looks like we don't have the lyrics for this song."] {display:none!important;} */
 
 [class="before-scroll-node"] {display:none!important;}
 
-[class="main-nowPlayingView-section main-nowPlayingView-credits"] {display:none!important;}
+/* moved to theme.js toggle (Elements settings): [class="main-nowPlayingView-section main-nowPlayingView-credits"] {display:none!important;} */
 
 /* Merch  */
-[class="main-nowPlayingView-section UF4iFZpYucsei5By"] {display:none!important;}
+/* moved to theme.js toggle (Elements settings): [class="main-nowPlayingView-section UF4iFZpYucsei5By"] {display:none!important;} */
 
 /* About Artist */
-[class="a7gn1W5xEIEyxWUU"] {display:none!important;}
+/* moved to theme.js toggle (Elements settings): [class="a7gn1W5xEIEyxWUU"] {display:none!important;} */
 
 /* On Tour */
-[class="main-nowPlayingView-section y6MSp2Cg3wf9ZqdX"] {display:none!important;}
+/* moved to theme.js toggle (Elements settings): [class="main-nowPlayingView-section y6MSp2Cg3wf9ZqdX"] {display:none!important;} */
 
 /* Switch to video*/
-[class="main-nowPlayingView-actionButtonContainer"] {display:none!important;}
+/* moved to theme.js toggle (Elements settings): [class="main-nowPlayingView-actionButtonContainer"] {display:none!important;} */
 
 .main-nowPlayingView-section {
     background-color: rgb(0 0 0 / 0%);
@@ -3222,8 +3222,6 @@ position: static;
 [class="playlist-playlist-sectionGrid playlistRecommenderContainer"] {display: none !important;}
 
 
-[class="e-10451-legacy-button e-10451-legacy-button-tertiary e-10451-overflow-wrap-anywhere e-10451-button-tertiary--icon-only-small e-10451-button-tertiary--icon-only e-10451-button-tertiary--text-subdued encore-internal-color-text-subdued main-genericButton-button"] {display: none !important;}
-
 .main-contextMenu-menu, .main-contextMenu-tippy > div, ul > div[data-tippy-root], .aCtCKL9BxAoHeVZS0uRs, .Dropdown-menu {
     background-color: rgb(40 40 40 / 0%) !important;
 }
@@ -3256,6 +3254,10 @@ display: none !important;
 
 .GenericModal__overlay > div[role="dialog"], .main-trackCreditsModal-container, .main-aboutRecsModal-container, .main-playlistEditDetailsModal-container, .profile-userEditDetails-container, .artist-artistAbout-modal, .bupRDM6tHHYnfPxEfQ_h, dialog.NiqTdDnFi5KAXoGukrdo.aOxbsZDBlepfQptv_EfI, dialog.jMkF9P0MOVAsPeHbK88D, dialog:has(.main-duplicateTrackModal-container), dialog:has(div > button[aria-label="Close"]) {
     background-color: rgb(48 48 48 / 0%) !important;
+}
+
+.main-trackCreditsModal-header {
+    border-bottom: none;
 }
 
 

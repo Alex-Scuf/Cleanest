@@ -111,6 +111,24 @@
       master: true,
     },
     {
+      id: "EdgeGlowTop",
+      name: "Top strip",
+      defVal: true,
+      group: "edgeglow",
+    },
+    {
+      id: "EdgeGlowLeft",
+      name: "Left strip",
+      defVal: true,
+      group: "edgeglow",
+    },
+    {
+      id: "EdgeGlowBottom",
+      name: "Bottom strip",
+      defVal: true,
+      group: "edgeglow",
+    },
+    {
       id: "EdgeGlowReactive",
       name: "Edge glow reacts to music loudness",
       defVal: true,
@@ -134,6 +152,9 @@
     AmbienceEnabled: true,
     AmbienceReactive: true,
     EdgeGlowEnabled: true,
+    EdgeGlowTop: true,
+    EdgeGlowLeft: true,
+    EdgeGlowBottom: true,
     EdgeGlowReactive: true
   };
   const sliders = [
@@ -781,6 +802,19 @@
       toggles.EdgeGlowEnabled ? 1 : 0
     );
 
+    // Per-side visibility — each independently hides just that strip,
+    // regardless of the others, on top of the master switch above.
+    const EDGE_SIDE_TOGGLES = {
+      EdgeGlowTop: "__cleanest_hide_edgeglow_top",
+      EdgeGlowLeft: "__cleanest_hide_edgeglow_left",
+      EdgeGlowBottom: "__cleanest_hide_edgeglow_bottom",
+    };
+    for (const [id, className] of Object.entries(EDGE_SIDE_TOGGLES)) {
+      const stored = localStorage.getItem(id);
+      toggles[id] = stored === null ? true : JSON.parse(stored);
+      document.body.classList.toggle(className, !toggles[id]);
+    }
+
     const storedEdgeReactive = localStorage.getItem("EdgeGlowReactive");
     toggles.EdgeGlowReactive = storedEdgeReactive === null ? true : JSON.parse(storedEdgeReactive);
     document.documentElement.style.setProperty(
@@ -1042,6 +1076,9 @@
     // art, so there's no color-related setting here, just size/blur/opacity.
     toggleInfo
       .filter((opt) => opt.master && opt.group === "edgeglow")
+      .forEach((opt) => createToggle(opt, edgeGlowColumn));
+    toggleInfo
+      .filter((opt) => opt.group === "edgeglow" && !opt.master && !opt.animated)
       .forEach((opt) => createToggle(opt, edgeGlowColumn));
     sliders
       .filter((opt) => opt.group === "edgeglow" && !opt.animated)
@@ -1449,6 +1486,11 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			right: 0;
 			height: var(--npv-edge-glow-size, 100px);
 			background: linear-gradient(to top, var(--spice-accent, #1db954), transparent);
+		}
+		body.__cleanest_hide_edgeglow_top .npv-edge-glow--top,
+		body.__cleanest_hide_edgeglow_left .npv-edge-glow--left,
+		body.__cleanest_hide_edgeglow_bottom .npv-edge-glow--bottom {
+			display: none !important;
 		}
 
 		/* Real elements attached to <body> (not inside the sidebar's DOM

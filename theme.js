@@ -25,6 +25,70 @@
       defVal: false,
       group: "theme",
     },
+    // Toggleable NPV sections — all default to hidden (true) to match what
+    // was previously hardcoded off in user.css, so nothing changes visually
+    // on first load; now it's just switchable instead of permanent.
+    {
+      id: "HideLyricsButton",
+      name: "Lyrics button",
+      defVal: true,
+      group: "elements",
+    },
+    {
+      id: "HideListeningActivity",
+      name: "Listening activity",
+      defVal: true,
+      group: "elements",
+    },
+    {
+      id: "HideCredits",
+      name: "Credits",
+      defVal: true,
+      group: "elements",
+    },
+    {
+      id: "HideMerch",
+      name: "Merch",
+      defVal: true,
+      group: "elements",
+    },
+    {
+      id: "HideAboutArtist",
+      name: "About Artist",
+      defVal: true,
+      group: "elements",
+    },
+    {
+      id: "HideOnTour",
+      name: "On Tour",
+      defVal: true,
+      group: "elements",
+    },
+    {
+      id: "HideSwitchToVideo",
+      name: "Switch to video",
+      defVal: true,
+      group: "elements",
+    },
+    // These two weren't found hardcoded in your CSS (unlike the 7 above,
+    // which I confirmed directly in your file) — best-effort selectors
+    // based on the common aria-label wording, using case-insensitive
+    // substring matches for a bit of resilience. Default to OFF (visible)
+    // since I don't know if you actually want them hidden yet. Check
+    // DevTools if a toggle doesn't do anything and send me the real
+    // aria-label/class so I can fix the selector.
+    {
+      id: "HideMiniPlayer",
+      name: "Mini player (unverified)",
+      defVal: false,
+      group: "elements",
+    },
+    {
+      id: "HideFullscreenButton",
+      name: "Fullscreen button (unverified)",
+      defVal: false,
+      group: "elements",
+    },
     {
       id: "AmbienceEnabled",
       name: "Enable ambience glow",
@@ -58,6 +122,15 @@
     UseCustomBackground: false,
     UseCustomColor: false,
     HideNowPlayingSidebar: false,
+    HideLyricsButton: true,
+    HideListeningActivity: true,
+    HideCredits: true,
+    HideMerch: true,
+    HideAboutArtist: true,
+    HideOnTour: true,
+    HideSwitchToVideo: true,
+    HideMiniPlayer: false,
+    HideFullscreenButton: false,
     AmbienceEnabled: true,
     AmbienceReactive: true,
     EdgeGlowEnabled: true,
@@ -353,7 +426,16 @@
         setAccentColor(hexColor);
       };
 
-      img.src = getCurrentBackground(true);
+      // Always derived from the actual currently-playing track's own cover
+      // (same as the right-hand Now Playing panel) — NOT getCurrentBackground(),
+      // which instead reflects whatever's set as the background overlay and
+      // switches to a fixed custom image when "Custom background" is on.
+      // Using that here meant the accent color used to jump to match the
+      // custom background image instead of following the playing track.
+      const trackImageUrl = Spicetify?.Player?.data?.item?.metadata?.image_url;
+      img.src = trackImageUrl
+        ? trackImageUrl.replace("spotify:image:", "https://i.scdn.co/image/")
+        : startImage;
     } else {
       setAccentColor(localStorage.getItem("CustomColor") || "#ffc0ea");
     }
@@ -526,13 +608,15 @@
           lyricsContentWrapper.style.width = "";
 
           // 0, 1 - blank lines
-          const lyric = document.querySelector(
+          const lyric = document.querySelectorAll(
             ".lyrics-lyricsContent-lyric"
           )[2];
-          document.documentElement.style.setProperty(
-            "--lyrics-text-direction",
-            /[\u0591-\u07FF]/.test(lyric.innerText) ? "right" : "left"
-          );
+          if (lyric) {
+            document.documentElement.style.setProperty(
+              "--lyrics-text-direction",
+              /[\u0591-\u07FF]/.test(lyric.innerText) ? "right" : "left"
+            );
+          }
 
           document.documentElement.style.setProperty(
             "--lyrics-active-max-width",
@@ -646,6 +730,26 @@
     );
     toggles.UseCustomColor = JSON.parse(localStorage.getItem("UseCustomColor"));
     toggles.HideNowPlayingSidebar = JSON.parse(localStorage.getItem("HideNowPlayingSidebar"));
+
+    // Toggleable NPV elements — each maps to a body class the CSS below
+    // reads. All default to true (hidden), matching what used to be
+    // permanently hardcoded off.
+    const ELEMENT_TOGGLES = {
+      HideLyricsButton: { className: "__cleanest_hide_lyrics", defVal: true },
+      HideListeningActivity: { className: "__cleanest_hide_listeningactivity", defVal: true },
+      HideCredits: { className: "__cleanest_hide_credits", defVal: true },
+      HideMerch: { className: "__cleanest_hide_merch", defVal: true },
+      HideAboutArtist: { className: "__cleanest_hide_aboutartist", defVal: true },
+      HideOnTour: { className: "__cleanest_hide_ontour", defVal: true },
+      HideSwitchToVideo: { className: "__cleanest_hide_switchtovideo", defVal: true },
+      HideMiniPlayer: { className: "__cleanest_hide_miniplayer", defVal: false },
+      HideFullscreenButton: { className: "__cleanest_hide_fullscreen", defVal: false },
+    };
+    for (const [id, { className, defVal }] of Object.entries(ELEMENT_TOGGLES)) {
+      const stored = localStorage.getItem(id);
+      toggles[id] = stored === null ? defVal : JSON.parse(stored);
+      document.body.classList.toggle(className, toggles[id]);
+    }
 
     // Master switch — defaults to ON (matches prior behavior for anyone who
     // already has the glow configured). Turning this off disables the whole
@@ -878,6 +982,8 @@
     ambienceColumn.classList.add("cleanestSettingsColumn");
     const edgeGlowColumn = document.createElement("div");
     edgeGlowColumn.classList.add("cleanestSettingsColumn");
+    const elementsColumn = document.createElement("div");
+    elementsColumn.classList.add("cleanestSettingsColumn");
 
     addSectionHeader("Theme", themeColumn);
     toggleInfo
@@ -949,7 +1055,12 @@
       .filter((opt) => opt.group === "edgeglow" && opt.animated)
       .forEach((opt) => createSlider(opt, edgeGlowColumn));
 
-    columnsWrapper.append(themeColumn, ambienceColumn, edgeGlowColumn);
+    addSectionHeader("Elements", elementsColumn);
+    toggleInfo
+      .filter((opt) => opt.group === "elements")
+      .forEach((opt) => createToggle(opt, elementsColumn));
+
+    columnsWrapper.append(themeColumn, ambienceColumn, edgeGlowColumn, elementsColumn);
     content.append(columnsWrapper);
 
     loadSliders();
@@ -1134,6 +1245,47 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			--npv-ambience-reactive-brightness: 1;
 		}
 
+		/* Toggleable NPV elements — hidden only while the matching body class
+		   (set by loadToggles() above) is present, instead of permanently. */
+		body.__cleanest_hide_lyrics [aria-label="Lyrics"],
+		body.__cleanest_hide_lyrics [aria-label="Looks like we don't have the lyrics for this song."] {
+			display: none !important;
+		}
+		body.__cleanest_hide_listeningactivity [aria-label="Listening activity"] {
+			display: none !important;
+		}
+		body.__cleanest_hide_credits [class="main-nowPlayingView-section main-nowPlayingView-credits"] {
+			display: none !important;
+		}
+		body.__cleanest_hide_merch [class="main-nowPlayingView-section UF4iFZpYucsei5By"] {
+			display: none !important;
+		}
+		body.__cleanest_hide_aboutartist [class="a7gn1W5xEIEyxWUU"] {
+			display: none !important;
+		}
+		body.__cleanest_hide_ontour [class="main-nowPlayingView-section y6MSp2Cg3wf9ZqdX"] {
+			display: none !important;
+		}
+		body.__cleanest_hide_switchtovideo [class="main-nowPlayingView-actionButtonContainer"] {
+			display: none !important;
+		}
+		/* Confirmed exact aria-labels from your DevTools screenshot:
+		   "Open Miniplayer" / "Enter Full screen" (likely toggle to
+		   "Close Miniplayer" / "Exit Full screen" when active — the
+		   substring matches below cover both states). Added :has() as a
+		   fallback in case the aria-label sits on an inner element rather
+		   than the clickable button itself, which would make hiding just
+		   that inner piece leave an empty button-shaped gap instead of
+		   fully removing it. */
+		body.__cleanest_hide_miniplayer [aria-label*="iniplayer" i],
+		body.__cleanest_hide_miniplayer button:has([aria-label*="iniplayer" i]) {
+			display: none !important;
+		}
+		body.__cleanest_hide_fullscreen [aria-label*="ull screen" i],
+		body.__cleanest_hide_fullscreen button:has([aria-label*="ull screen" i]) {
+			display: none !important;
+		}
+
 		/* Cleanest Settings modal: section headers + the "greyed out while
 		   disabled" state for ambience-dependent rows. Bundled into this
 		   same injected stylesheet since it's the only one this theme sets
@@ -1141,10 +1293,9 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		.cleanestSectionHeader {
 			font-size: 1rem;
 			font-weight: 700;
-			margin-top: 18px;
-			margin-bottom: 4px;
+			margin-top: 10px;
+			margin-bottom: 2px;
 			padding-bottom: 4px;
-			border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 		}
 		.cleanestSubHeader {
 			font-size: 0.75rem;
@@ -1152,30 +1303,70 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			text-transform: uppercase;
 			letter-spacing: 0.05em;
 			opacity: 0.6;
-			margin-top: 10px;
+			margin-top: 4px;
 		}
 		.cleanestOptionRow.cleanest-disabled {
 			opacity: 0.4;
 			pointer-events: none;
 		}
+		/* Toggle rows: put the switch right next to its label instead of
+		   pushed to the far right edge of the (narrow) column — with short
+		   labels like "Credits:" the space-between gap from user.css looked
+		   huge. Also tightened vertical spacing throughout so 8 rows worth
+		   of settings fit without needing to scroll on most screens. */
+		.cleanestSettingsColumn .cleanestOptionRow {
+			justify-content: flex-start;
+			gap: 10px;
+			padding-top: 4px;
+		}
+		/* user.css right-aligns this label (fine for single-line text, but
+		   wrapped 2-line labels like "Ambience reacts to music loudness"
+		   ended up hugging the right edge instead of reading left-to-right
+		   normally). */
+		.cleanestSettingsColumn .cleanestOptionDesc {
+			text-align: left;
+			margin-right: 0;
+		}
+		.cleanestSettingsColumn .slider-container {
+			padding-top: 0;
+		}
 
-		/* Widen the settings modal itself and lay Theme / Ambience Glow out
-		   side by side instead of one long vertical list. Scoped to this
-		   specific modal via its aria-label so nothing else in the app is
-		   affected. */
+		/* Widen the settings modal itself and lay Theme / Ambience Glow / Edge
+		   Glow / Elements out side by side instead of one long vertical list.
+		   Scoped to this specific modal via its aria-label so nothing else in
+		   the app is affected. */
 		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-container {
-			width: 960px !important;
-			max-width: 95vw !important;
+			width: fit-content !important;
+			min-width: 720px !important;
+			max-width: 96vw !important;
+			height: auto !important;
+			max-height: 85vh !important;
+		}
+		/* user.css sets this section to overflow-y: hidden (content just got
+		   clipped if it didn't fit); switching to auto lets a shorter modal
+		   scroll internally instead of being forced to grow tall enough to
+		   show everything at once. */
+		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-mainSection {
+			overflow-y: auto !important;
+			height: auto !important;
+			max-height: 85vh !important;
+			padding-top: 12px !important;
+			padding-bottom: 12px !important;
+		}
+		div[aria-label="Cleanest Settings"] #home-select {
+			height: 80px !important;
+			margin-bottom: 8px !important;
 		}
 		.cleanestSettingsColumns {
 			display: flex;
-			gap: 32px;
+			gap: 18px;
 			align-items: flex-start;
 			margin-top: 4px;
 		}
 		.cleanestSettingsColumn {
-			flex: 1 1 0;
+			flex: 0 1 auto;
 			min-width: 0;
+			max-width: 320px;
 		}
 		.cleanestSettingsColumn .cleanestSectionHeader {
 			margin-top: 0;
@@ -1203,17 +1394,24 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		.cleanestSettingsColumn .slider-container .slider-value {
 			flex: 0 0 auto;
 		}
-		/* Modal title — Spicetify renders this itself (not part of our
-		   content object), so it's centered purely via CSS, scoped to this
-		   one modal by its aria-label. Targets any heading tag, plus flex:1
-		   as a fallback in case the title sits in a flex row next to the
-		   close button (so text-align has room to actually center within). */
-		/* Title centering was removed here after repeated attempts kept
-		   interfering with the close button's clickable area in ways I
-		   couldn't verify without live DevTools access — a working close
-		   button matters more than a centered title. If you still want it
-		   centered, grab the title element's actual class/structure from
-		   DevTools and I can target it precisely instead of guessing. */
+		/* Modal title. Two earlier attempts using flex:1 + width:100% broke
+		   the close button's clickable area — likely because forcing the
+		   title to grow via flex pushed/resized it as a flex sibling of the
+		   close button. This time: plain text-align only, no flex, no width,
+		   no position change — if the title is normal block-level content
+		   (not itself a flex item), this centers the text without being
+		   able to affect any sibling's box at all. */
+		/* Confirmed via DevTools: title is an <h2> inside
+		   .main-trackCreditsModal-header, sitting in a flex row alongside
+		   the close button. Last attempt's width:100% is what broke the
+		   close button — forcing full parent width ignores the flex
+		   algorithm's own space allocation and let the box extend over the
+		   button. flex:1 alone respects sibling space properly. */
+		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header h2 {
+			flex: 1;
+			text-align: center;
+			pointer-events: none;
+		}
 
 		/* Screen edge glow: colored by the theme's own dynamic accent
 		   (var(--spice-accent) — same variable the liked-songs heart uses),
@@ -1555,6 +1753,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 	// Edge glow's pulse state (always active — this effect isn't gated on
 	// Now Playing View's cover art existing).
 	let edgeGlowSmoothed = 1;
+	let lastWrittenEdgeGlow = "";
 
 	let lastRectKey = "";
 	let lastWrittenBrightness = "";
@@ -1569,13 +1768,14 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 	// that regardless of how many effects are active at once.
 	function masterLoop() {
 		const rootStyle = getComputedStyle(document.documentElement);
+		const isPaused = !!(Spicetify.Player.data && Spicetify.Player.data.isPaused);
 		const posSec = getPrecisePositionMs() / 1000;
 
 		// --- Edge glow: cheap, always runs regardless of NPV state ---
 		const edgeEnabled = rootStyle.getPropertyValue("--npv-edge-glow-enabled").trim() !== "0";
 		const edgeReactive = rootStyle.getPropertyValue("--npv-edge-glow-reactive-enabled").trim() !== "0";
 		let edgeTarget = 1;
-		if (edgeEnabled && edgeReactive) {
+		if (edgeEnabled && edgeReactive && !isPaused) {
 			const punch = getBeatPunch(posSec);
 			let norm = 0;
 			if (punch !== null) {
@@ -1589,8 +1789,16 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			const boost = (Number.parseFloat(rootStyle.getPropertyValue("--npv-edge-glow-reactive-boost")) || 200) / 100;
 			edgeTarget = 1 + norm * (boost - 1);
 		}
-		edgeGlowSmoothed += (edgeTarget - edgeGlowSmoothed) * 0.15;
-		document.documentElement.style.setProperty("--npv-edge-glow-reactive-brightness", edgeGlowSmoothed.toFixed(3));
+		// On pause, position genuinely stops advancing, so target values
+		// would converge and settle within a couple frames anyway — this
+		// just skips straight to "settled" instead of easing there over
+		// ~1-2s, since nothing changes on screen while paused regardless.
+		edgeGlowSmoothed += (edgeTarget - edgeGlowSmoothed) * (isPaused ? 1 : 0.15);
+		const roundedEdgeGlow = edgeGlowSmoothed.toFixed(2);
+		if (roundedEdgeGlow !== lastWrittenEdgeGlow) {
+			lastWrittenEdgeGlow = roundedEdgeGlow;
+			document.documentElement.style.setProperty("--npv-edge-glow-reactive-brightness", roundedEdgeGlow);
+		}
 
 		// --- Cover art ambience glow: only while NPV's cover art exists ---
 		const cover = document.querySelector(".main-nowPlayingView-coverArtContainer");
@@ -1612,7 +1820,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		const sizeSmoothing = Math.max(reactiveSmoothing * 0.6, 0.03);
 
 		let punchNorm = 0;
-		if (reactiveEnabled) {
+		if (reactiveEnabled && !isPaused) {
 			const punch = getBeatPunch(posSec);
 			if (punch !== null) {
 				punchNorm = Math.min(punch, 1);
@@ -1627,15 +1835,15 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		const targetBrightness = reactiveEnabled
 			? reactiveMin + punchNorm * (reactiveMax - reactiveMin)
 			: staticBrightness;
-		smoothedBrightness += (targetBrightness - smoothedBrightness) * reactiveSmoothing;
-		const roundedBrightness = smoothedBrightness.toFixed(3);
+		smoothedBrightness += (targetBrightness - smoothedBrightness) * (isPaused ? 1 : reactiveSmoothing);
+		const roundedBrightness = smoothedBrightness.toFixed(2);
 		if (roundedBrightness !== lastWrittenBrightness) {
 			lastWrittenBrightness = roundedBrightness;
 			document.documentElement.style.setProperty("--npv-ambience-reactive-brightness", roundedBrightness);
 		}
 
 		const targetSizeMult = 1 + punchNorm * (reactiveSizeMax - 1);
-		smoothedSizeMult += (targetSizeMult - smoothedSizeMult) * sizeSmoothing;
+		smoothedSizeMult += (targetSizeMult - smoothedSizeMult) * (isPaused ? 1 : sizeSmoothing);
 		const spread = Math.min(Math.max(baseSpread * smoothedSizeMult, 2), 200);
 
 		// Geometry/background writes stay throttled to ~30fps — still the

@@ -56,6 +56,12 @@ Lyrics (Because I using "Spicy Lyrics")
 Merch
   <br>
   <br>
+Mini Player
+  <br>
+  <br>
+Fullscreen
+  <br>
+  <br>
 Credits
   <br>
   <br>
@@ -77,11 +83,13 @@ The background of certain context menus, to give them a "Liquid Glass" look
 Recommended tracks at the end of the playlist/album
   </b>
 </div>
+<br>
+
 
 These are all the settings for now:
 </div>
 <p align=center>
-<img width="1192" height="770" alt="Снимок экрана 2026-08-06 093017" src="https://github.com/user-attachments/assets/cc2026ca-0292-44e4-81e3-df0616736f16" />
+<img width="1175" height="764" alt="Снимок экрана 2026-08-06 094904" src="https://github.com/user-attachments/assets/e2dcd589-34a4-4754-b953-d949188af070" />
 
 
 </p>

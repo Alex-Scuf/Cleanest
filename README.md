@@ -25,7 +25,7 @@
 <img width="84" height="358" alt="ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/6aa94b6c-3ac4-4b10-9911-be04d0fe7e2a" />
 </P>
 
-<h2 align=center>2. A glow effect has been added for the track cover art</h2>
+<h2 align=center>2. A dynamic glow effect has been added for the track cover art</h2>
 
 <p align=center>
 <img width="132" height="193" alt="2026-08-0113-05-45-ezgif com-crop" src="https://github.com/user-attachments/assets/00812c9c-5d96-451b-bfe6-945511b4a7fd" />
@@ -41,17 +41,7 @@ You can adjust the glow's brightness and blur in Theme Settings.
 <img width="800" height="431" alt="ezgif com-crop" src="https://github.com/user-attachments/assets/5eb3b3d0-84b9-489e-809f-f01d09fd8c90" />
 </p>
 
-You can also configure the behavior in the settings.
-
-These are all the settings for now:
-</div>
-<p align=center>
-  <img width="964" height="967" alt="Снимок экрана 2026-08-04 184427" src="https://github.com/user-attachments/assets/f0b5bdc5-bf6e-4be1-b0ef-61ff65499ea2" />
-
-</p>
-<p align=center><b>More settings will be added in the future</b></p>
-
-<h2 align=center>3. A large number of elements that I find useless have been hidden</h2>
+<h2 align=center>4. A large number of elements that I find useless have been hidden</h2>
 <div align=center>
   <b>
   These include:
@@ -87,3 +77,14 @@ The background of certain context menus, to give them a "Liquid Glass" look
 Recommended tracks at the end of the playlist/album
   </b>
 </div>
+
+These are all the settings for now:
+</div>
+<p align=center>
+<img width="1192" height="770" alt="Снимок экрана 2026-08-06 093017" src="https://github.com/user-attachments/assets/cc2026ca-0292-44e4-81e3-df0616736f16" />
+
+
+</p>
+<p align=center><b>More settings will be added in the future</b></p>
+
+

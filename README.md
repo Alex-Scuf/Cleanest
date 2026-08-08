@@ -65,6 +65,15 @@ Fullscreen
 Credits
   <br>
   <br>
+What's New
+  <br>
+  <br>
+Queue
+  <br>
+  <br>
+Connect to a device
+  <br>
+  <br>
 About Artist
   <br>
   <br>

@@ -79,13 +79,31 @@
     // aria-label/class so I can fix the selector.
     {
       id: "HideMiniPlayer",
-      name: "Mini player (unverified)",
+      name: "Mini player",
       defVal: false,
       group: "elements",
     },
     {
       id: "HideFullscreenButton",
-      name: "Fullscreen button (unverified)",
+      name: "Fullscreen button",
+      defVal: false,
+      group: "elements",
+    },
+    {
+      id: "HideQueueButton",
+      name: "Queue button",
+      defVal: false,
+      group: "elements",
+    },
+    {
+      id: "HideConnectDevice",
+      name: "Connect to a device",
+      defVal: false,
+      group: "elements",
+    },
+    {
+      id: "HideWhatsNew",
+      name: "What's New",
       defVal: false,
       group: "elements",
     },
@@ -149,6 +167,9 @@
     HideSwitchToVideo: true,
     HideMiniPlayer: false,
     HideFullscreenButton: false,
+    HideQueueButton: false,
+    HideConnectDevice: false,
+    HideWhatsNew: false,
     AmbienceEnabled: true,
     AmbienceReactive: true,
     EdgeGlowEnabled: true,
@@ -765,6 +786,9 @@
       HideSwitchToVideo: { className: "__cleanest_hide_switchtovideo", defVal: true },
       HideMiniPlayer: { className: "__cleanest_hide_miniplayer", defVal: false },
       HideFullscreenButton: { className: "__cleanest_hide_fullscreen", defVal: false },
+      HideQueueButton: { className: "__cleanest_hide_queue", defVal: false },
+      HideConnectDevice: { className: "__cleanest_hide_connectdevice", defVal: false },
+      HideWhatsNew: { className: "__cleanest_hide_whatsnew", defVal: false },
     };
     for (const [id, { className, defVal }] of Object.entries(ELEMENT_TOGGLES)) {
       const stored = localStorage.getItem(id);
@@ -1320,6 +1344,18 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		}
 		body.__cleanest_hide_fullscreen [aria-label*="ull screen" i],
 		body.__cleanest_hide_fullscreen button:has([aria-label*="ull screen" i]) {
+			display: none !important;
+		}
+		body.__cleanest_hide_queue [aria-label="Queue"],
+		body.__cleanest_hide_queue button:has([aria-label="Queue"]) {
+			display: none !important;
+		}
+		body.__cleanest_hide_connectdevice [aria-label="Connect to a device"],
+		body.__cleanest_hide_connectdevice button:has([aria-label="Connect to a device"]) {
+			display: none !important;
+		}
+		body.__cleanest_hide_whatsnew [aria-label="What's New"],
+		body.__cleanest_hide_whatsnew button:has([aria-label="What's New"]) {
 			display: none !important;
 		}
 

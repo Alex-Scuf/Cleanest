@@ -1346,16 +1346,16 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		body.__cleanest_hide_fullscreen button:has([aria-label*="ull screen" i]) {
 			display: none !important;
 		}
-		body.__cleanest_hide_queue [aria-label="Queue"],
-		body.__cleanest_hide_queue button:has([aria-label="Queue"]) {
+		body.__cleanest_hide_queue [data-testid="now-playing-bar"] [aria-label="Queue"],
+		body.__cleanest_hide_queue [data-testid="now-playing-bar"] button:has([aria-label="Queue"]) {
 			display: none !important;
 		}
-		body.__cleanest_hide_connectdevice [aria-label="Connect to a device"],
-		body.__cleanest_hide_connectdevice button:has([aria-label="Connect to a device"]) {
+		body.__cleanest_hide_connectdevice [data-testid="now-playing-bar"] [aria-label="Connect to a device"],
+		body.__cleanest_hide_connectdevice [data-testid="now-playing-bar"] button:has([aria-label="Connect to a device"]) {
 			display: none !important;
 		}
-		body.__cleanest_hide_whatsnew [aria-label="What's New"],
-		body.__cleanest_hide_whatsnew button:has([aria-label="What's New"]) {
+		body.__cleanest_hide_whatsnew #global-nav-bar [aria-label="What's New"],
+		body.__cleanest_hide_whatsnew #global-nav-bar button:has([aria-label="What's New"]) {
 			display: none !important;
 		}
 

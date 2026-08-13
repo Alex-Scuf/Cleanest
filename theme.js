@@ -25,6 +25,12 @@
       defVal: false,
       group: "theme",
     },
+    {
+      id: "ExtendSidebars",
+      name: "Sidebars extend behind player bar",
+      defVal: false,
+      group: "theme",
+    },
     // Toggleable NPV sections — all default to hidden (true) to match what
     // was previously hardcoded off in user.css, so nothing changes visually
     // on first load; now it's just switchable instead of permanent.
@@ -158,6 +164,7 @@
     UseCustomBackground: false,
     UseCustomColor: false,
     HideNowPlayingSidebar: false,
+    ExtendSidebars: false,
     HideLyricsButton: true,
     HideListeningActivity: true,
     HideCredits: true,
@@ -853,6 +860,10 @@
       document.body.classList.remove("__cleanest_hidenowplayingsidebar");
     }
 
+    const storedExtendSidebars = localStorage.getItem("ExtendSidebars");
+    toggles.ExtendSidebars = storedExtendSidebars === null ? false : JSON.parse(storedExtendSidebars);
+    document.body.classList.toggle("__cleanest_extend_sidebars", toggles.ExtendSidebars);
+
     onSongChange();
   }
 
@@ -1254,6 +1265,41 @@
     content.append(buttonsRow);
 
     Spicetify.PopupModal.display({ title: "Cleanest Settings", content });
+    /* The native .main-trackCreditsModal-closeBtn kept rendering way
+       outside the modal (confirmed via DevTools — its highlight box
+       showed up over the mini-player area, nowhere near our header),
+       almost certainly due to some Encore component CSS layer setting
+       position: fixed/absolute on it that our rules can't out-specificity.
+       Rather than keep chasing that, just hide it and drop in a plain
+       button of our own inside the header — as a normal flex child it
+       automatically lands next to the centered title with no positioning
+       tricks needed. Polling briefly because PopupModal's content isn't
+       necessarily attached to the document the instant display() returns. */
+    let closeBtnAttempts = 0;
+    const attachCleanestCloseBtn = () => {
+      closeBtnAttempts++;
+      const header = document.querySelector(
+        'div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header'
+      );
+      const nativeClose = header?.querySelector(
+        ".main-trackCreditsModal-closeBtn"
+      );
+      if (header && nativeClose) {
+        nativeClose.style.setProperty("display", "none", "important");
+        if (!header.querySelector(".cleanestCloseBtn")) {
+          const closeBtn = document.createElement("button");
+          closeBtn.className = "cleanestCloseBtn";
+          closeBtn.type = "button";
+          closeBtn.setAttribute("aria-label", "Close");
+          closeBtn.innerHTML = "&#10005;";
+          closeBtn.onclick = () => nativeClose.click();
+          header.appendChild(closeBtn);
+        }
+        return;
+      }
+      if (closeBtnAttempts < 20) setTimeout(attachCleanestCloseBtn, 50);
+    };
+    attachCleanestCloseBtn();
   });
   homeEdit.element.classList.toggle("hidden", false);
 })();
@@ -1467,23 +1513,46 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		.cleanestSettingsColumn .slider-container .slider-value {
 			flex: 0 0 auto;
 		}
-		/* Modal title. Two earlier attempts using flex:1 + width:100% broke
-		   the close button's clickable area — likely because forcing the
-		   title to grow via flex pushed/resized it as a flex sibling of the
-		   close button. This time: plain text-align only, no flex, no width,
-		   no position change — if the title is normal block-level content
-		   (not itself a flex item), this centers the text without being
-		   able to affect any sibling's box at all. */
-		/* Confirmed via DevTools: title is an <h2> inside
-		   .main-trackCreditsModal-header, sitting in a flex row alongside
-		   the close button. Last attempt's width:100% is what broke the
-		   close button — forcing full parent width ignores the flex
-		   algorithm's own space allocation and let the box extend over the
-		   button. flex:1 alone respects sibling space properly. */
-		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header h2 {
-			flex: 1;
-			text-align: center;
-			pointer-events: none;
+		/* Modal title + close button. DevTools confirmed the real markup:
+		   .main-trackCreditsModal-header contains an <h1 class="main-type-alto">
+		   (not an h2 — that was the bug in the last two attempts, the
+		   selector never matched anything) followed by the close <button>.
+		   The header itself isn't a flex row by default here, so the
+		   button just falls onto its own line under the title. Making the
+		   header a flex row, pinning the button to auto width, and letting
+		   the title fill+center in the remaining space fixes both the
+		   centering and the button position in one go. */
+		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header {
+			display: flex !important;
+			align-items: center !important;
+			justify-content: space-between !important;
+			gap: 12px !important;
+		}
+		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header h1 {
+			flex: 1 1 auto !important;
+			text-align: center !important;
+			margin: 0 !important;
+			pointer-events: none !important;
+		}
+		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header .cleanestCloseBtn {
+			flex: 0 0 auto !important;
+			display: flex !important;
+			align-items: center !important;
+			justify-content: center !important;
+			width: 28px !important;
+			height: 28px !important;
+			padding: 0 !important;
+			margin: 0 !important;
+			border: none !important;
+			border-radius: 50% !important;
+			background: transparent !important;
+			color: var(--spice-text) !important;
+			font-size: 14px !important;
+			line-height: 1 !important;
+			cursor: pointer !important;
+		}
+		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header .cleanestCloseBtn:hover {
+			background: rgba(255, 255, 255, 0.1) !important;
 		}
 
 		/* Screen edge glow: colored by the theme's own dynamic accent
@@ -1527,6 +1596,76 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		body.__cleanest_hide_edgeglow_left .npv-edge-glow--left,
 		body.__cleanest_hide_edgeglow_bottom .npv-edge-glow--bottom {
 			display: none !important;
+		}
+
+		/* Second attempt at sidebars-reach-the-bottom, this time NOT
+		   touching grid-template-areas at all (that's what broke things
+		   before — likely conflicted with extra named grid lines the
+		   decorative overlay elements depend on, which stay fully intact
+		   this way). Instead, just moving these 4 specific elements to
+		   explicit numeric grid coordinates. DevTools' computed styles
+		   confirmed 4 rows x 3 columns (rows: top-banner / global-nav+
+		   right-sidebar / left-sidebar+main-view+right-sidebar /
+		   now-playing-bar — that's 5 grid lines, 1 through 5). The first
+		   pass used "2 / 4", which stops right at the line *before* the
+		   now-playing-bar row — the sidebar cell was already 100% tall,
+		   it just wasn't reaching that far down. "2 / 5" spans all the
+		   way through it. An element's own grid-row/grid-column always
+		   overrides whatever grid-area(name) it also has, so this
+		   doesn't require removing or fighting that. */
+		body.__cleanest_extend_sidebars .Root__nav-bar {
+			grid-row: 2 / 5 !important;
+			grid-column: 1 !important;
+			height: 100% !important;
+			align-self: stretch !important;
+			padding-top: 12px !important;
+			box-sizing: border-box !important;
+		}
+		body.__cleanest_extend_sidebars .Root__right-sidebar {
+			grid-row: 2 / 5 !important;
+			grid-column: 3 !important;
+			height: 100% !important;
+			align-self: stretch !important;
+			padding-top: 12px !important;
+			box-sizing: border-box !important;
+		}
+		/* The outer grid cell now correctly spans the full height, but the
+		   inner content wrapper (queue list, library list, etc.) has its
+		   own separate height that doesn't automatically inherit a taller
+		   parent — forcing height:100% down a couple more levels so the
+		   actual scrollable list reaches the bottom too, not just its
+		   invisible outer box. */
+		body.__cleanest_extend_sidebars .Root__right-sidebar > *,
+		body.__cleanest_extend_sidebars .Root__right-sidebar aside,
+		body.__cleanest_extend_sidebars .Root__right-sidebar aside > *,
+		body.__cleanest_extend_sidebars .Root__nav-bar > *,
+		body.__cleanest_extend_sidebars .Root__nav-bar nav {
+			height: 100% !important;
+		}
+		/* The rule above still wasn't enough for the right sidebar: DevTools
+		   showed several more wrapper divs sitting between .Root__right-sidebar
+		   and the actual <aside> Queue/NPV panel (a class-name animation
+		   wrapper, an aria-hidden wrapper, the .main-nowPlayingView-container
+		   itself, etc.) — none of them inherit height automatically, so the
+		   chain kept collapsing back to content size a few levels down.
+		   Naming each one explicitly closes that gap. If this stops working
+		   after a Spotify update, open DevTools on .Root__right-sidebar,
+		   expand it down to <aside>, and send me the new class names. */
+		body.__cleanest_extend_sidebars .Root__right-sidebar .qnaFIKUJ9oUIkN97,
+		body.__cleanest_extend_sidebars .Root__right-sidebar .a_fKt7xvd8od_kEb,
+		body.__cleanest_extend_sidebars .Root__right-sidebar .main-nowPlayingView-container,
+		body.__cleanest_extend_sidebars .Root__right-sidebar .ehfPbmtbhkOuWeF_,
+		body.__cleanest_extend_sidebars .Root__right-sidebar .FkNJ0wTwiYzUMox6 {
+			height: 100% !important;
+		}
+		/* main-view and now-playing-bar's row (Y) are left completely
+		   untouched this time — forcing those earlier is what pushed the
+		   player controls up to the top. Only now-playing-bar's column (X)
+		   is narrowed, so it stays in whatever row Spotify already puts it
+		   in, just visually centered between the now-taller sidebars. */
+		body.__cleanest_extend_sidebars .Root__now-playing-bar {
+			grid-column: 2 !important;
+			min-width: 0 !important;
 		}
 
 		/* Real elements attached to <body> (not inside the sidebar's DOM

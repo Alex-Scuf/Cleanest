@@ -1485,7 +1485,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		.cleanestSettingsColumn {
 			flex: 0 1 auto;
 			min-width: 0;
-			max-width: 320px;
+			max-width: 220px;
 		}
 		.cleanestSettingsColumn .cleanestSectionHeader {
 			margin-top: 0;

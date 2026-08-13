@@ -13,7 +13,7 @@
 
 <img width="1920" height="1041" alt="preview4" src="https://github.com/user-attachments/assets/65287a69-bade-4872-b247-8eba47ad6204" />
 
-
+<img width="1914" height="1035" alt="preview6" src="https://github.com/user-attachments/assets/dafea5a2-8102-4deb-a328-f8d157866166" />
 
 
 
@@ -94,12 +94,17 @@ Recommended tracks at the end of the playlist/album
 </div>
 <br>
 
+<h2 align=center>5. Scalable bottom panel</h2>
+
+
+<img width="798" height="412" alt="ezgif com-crop (1)" src="https://github.com/user-attachments/assets/09f9dcf2-139a-41bd-b2f5-5e24e9b4f1ee" />
+
+
 
 These are all the settings for now:
 </div>
 <p align=center>
-<img width="1127" height="758" alt="Снимок экрана 2026-08-08 212622" src="https://github.com/user-attachments/assets/d4697f2b-d408-44bf-9ddd-fad19c2d0662" />
-
+<img width="1167" height="764" alt="Снимок экрана 2026-08-13 091847" src="https://github.com/user-attachments/assets/80fe3591-73b4-4b12-9a88-6d07d614d7ea" />
 
 </p>
 <p align=center><b>More settings will be added in the future</b></p>

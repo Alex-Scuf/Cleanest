@@ -27,7 +27,7 @@
     },
     {
       id: "ExtendSidebars",
-      name: "Sidebars extend behind player bar",
+      name: "Scaleable bottom bar",
       defVal: false,
       group: "theme",
     },
@@ -1683,8 +1683,8 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			z-index: 9999;
 		}
 
-		/* Single blurred/tinted layer per side (not stacked) — simple,
-		   direct, and known to actually show visible color. */
+		/* One blurred/tinted element for the whole frame, with a clip-path
+		   hole cut out for the cover art itself (see npvAmbience() below). */
 		.npv-ambience-glow-layer--tint {
 			filter: blur(var(--npv-ambience-blur)) saturate(2.3) contrast(1.6) brightness(var(--npv-ambience-reactive-brightness, 1));
 		}
@@ -1784,23 +1784,54 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		return;
 	}
 
-	const SIDES = ["top", "bottom", "left", "right"];
+	// Single "frame" element per filter layer, attached directly to <body>.
+	// Previously this was 4 separate strip elements (top/bottom/left/right)
+	// so the glow could stay at a high z-index (always drawn above
+	// everything, sidestepping the app's unpredictable internal stacking
+	// order) without ever visually covering the cover art itself — each
+	// strip only ever occupied the margin area around it.
+	// Same safety property, one element: clip-path cuts a rectangular hole
+	// exactly matching the cover art's own rect out of the middle of a
+	// single square glow, using the evenodd fill rule (outer rectangle +
+	// inner rectangle drawn in the same path only paints the ring between
+	// them). This drops the blur filter from running on 4 elements down to
+	// 1, which is the actual expensive part — blurring is a full-surface
+	// rasterization pass, so 4 smaller blurred areas cost roughly as much
+	// as 1 big one, not less.
+	// Builds SVG path data for a rectangle with rounded corners — used to
+	// cut the glow's inner hole to the same shape as the cover art, instead
+	// of a hard rectangle. (clip-path: path() takes real SVG path syntax,
+	// which supports arcs; polygon() only does straight edges.)
+	function roundedRectPathData(x, y, w, h, r) {
+		r = Math.max(Math.min(r, w / 2, h / 2), 0);
+		if (r === 0) return `M${x},${y} L${x + w},${y} L${x + w},${y + h} L${x},${y + h} Z`;
+		return `M${x + r},${y} `
+			+ `L${x + w - r},${y} A${r},${r} 0 0 1 ${x + w},${y + r} `
+			+ `L${x + w},${y + h - r} A${r},${r} 0 0 1 ${x + w - r},${y + h} `
+			+ `L${x + r},${y + h} A${r},${r} 0 0 1 ${x},${y + h - r} `
+			+ `L${x},${y + r} A${r},${r} 0 0 1 ${x + r},${y} Z`;
+	}
 
-	// Create 4 thin "frame" strips per filter layer (top/bottom/left/right),
-	// attached directly to <body>. Because each strip only ever occupies the
-	// margin area around the cover art — never the cover art's own
-	// rectangle — it's safe to keep them at a high z-index (always drawn on
-	// top) without ever actually covering the artwork itself, sidestepping
-	// the app's unpredictable internal stacking order entirely.
-	function makeLayerSet(modifierClass) {
-		const set = {};
-		for (const side of SIDES) {
-			const el = document.createElement("div");
-			el.className = `npv-ambience-glow-layer ${modifierClass} npv-ambience-glow-layer--side-${side}`;
-			document.body.appendChild(el);
-			set[side] = el;
+	// The cover art itself is rounded (border-radius), so a hard rectangular
+	// hole leaves a gap at each corner where neither the artwork nor the
+	// glow paints anything — showing raw dark background through as small
+	// black corner notches. Reading the radius straight from the actual
+	// element (rather than hardcoding a guess) keeps this matching exactly
+	// even if Spotify changes it in a future update.
+	function getCoverCornerRadius(coverEl) {
+		const candidates = [coverEl, coverEl.querySelector("img")].filter(Boolean);
+		for (const el of candidates) {
+			const r = Number.parseFloat(getComputedStyle(el).borderRadius);
+			if (r > 0) return r;
 		}
-		return set;
+		return 8; // sane fallback if nothing reports a radius
+	}
+
+	function makeLayerSet(modifierClass) {
+		const el = document.createElement("div");
+		el.className = `npv-ambience-glow-layer ${modifierClass}`;
+		document.body.appendChild(el);
+		return el;
 	}
 
 	const layers = makeLayerSet("npv-ambience-glow-layer--tint");
@@ -1939,10 +1970,8 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		// into a flat, textureless smear instead of a soft colorful glow.
 		const url = metadata.image_xlarge_url || metadata.image_large_url || metadata.image_url;
 		const bg = `url(${url})`;
-		for (const layerSet of allLayers) {
-			for (const side of SIDES) {
-				layerSet[side].style.backgroundImage = bg;
-			}
+		for (const el of allLayers) {
+			el.style.backgroundImage = bg;
 		}
 	}
 
@@ -2081,24 +2110,37 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			const outerTop = rect.top - spread;
 			const bgSize = `${outerW}px ${outerH}px`;
 
-			const bands = {
-				top:    { left: outerLeft, top: outerTop, width: outerW, height: spread, bgX: 0, bgY: 0 },
-				bottom: { left: outerLeft, top: rect.bottom, width: outerW, height: spread, bgX: 0, bgY: -(outerH - spread) },
-				left:   { left: outerLeft, top: rect.top, width: spread, height: rect.height, bgX: 0, bgY: -spread },
-				right:  { left: rect.right, top: rect.top, width: spread, height: rect.height, bgX: -(outerW - spread), bgY: -spread },
-			};
+			// evenodd: an outer ring (clockwise) plus an inner ring, sharing
+			// no points, means only the ring *between* them gets painted —
+			// i.e. everything except the cover art's own rectangle.
+			// The outer ring is pushed well past the element's own box
+			// (not just 0/outerW/outerH) on purpose: clip-path clamps
+			// filter bleed too, not just the flat box — with the outer
+			// ring sitting exactly on the box edge, the blur's natural
+			// outward spill (which is what made the old 4-strip version
+			// fade softly into the background) was getting cut off flat,
+			// which is what made this version look like a hard-edged
+			// frame instead of a soft glow. Padding the outer ring out
+			// removes that clamp while the inner hole stays exact.
+			// The inner ring is rounded (not a plain rectangle) to match
+			// the cover art's own border-radius — otherwise each corner
+			// left a small square gap where neither the (rounded) artwork
+			// nor the (square-holed) glow painted anything, showing raw
+			// dark background through as black corner notches.
+			const pad = Math.max(spread * 4, 200);
+			const cornerRadius = getCoverCornerRadius(cover);
+			const outerPath = `M${-pad},${-pad} L${outerW + pad},${-pad} L${outerW + pad},${outerH + pad} L${-pad},${outerH + pad} Z`;
+			const innerPath = roundedRectPathData(spread, spread, rect.width, rect.height, cornerRadius);
+			const clipPath = `path(evenodd, "${outerPath} ${innerPath}")`;
 
-			for (const layerSet of allLayers) {
-				for (const side of SIDES) {
-					const b = bands[side];
-					const el = layerSet[side];
-					el.style.top = `${b.top}px`;
-					el.style.left = `${b.left}px`;
-					el.style.width = `${b.width}px`;
-					el.style.height = `${b.height}px`;
-					el.style.backgroundSize = bgSize;
-					el.style.backgroundPosition = `${b.bgX}px ${b.bgY}px`;
-				}
+			for (const el of allLayers) {
+				el.style.top = `${outerTop}px`;
+				el.style.left = `${outerLeft}px`;
+				el.style.width = `${outerW}px`;
+				el.style.height = `${outerH}px`;
+				el.style.backgroundSize = bgSize;
+				el.style.backgroundPosition = "0px 0px";
+				el.style.clipPath = clipPath;
 			}
 		}
 		document.documentElement.style.setProperty("--npv-ambience-opacity", rect.width > 0 ? 1 : 0);

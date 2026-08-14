@@ -3290,8 +3290,8 @@ div:has(> img[src*="liked-songs"])::after {
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
   mask-position: center;
-  -webkit-mask-size: 55%;
-  mask-size: 55%;
+  -webkit-mask-size: 50%;
+  mask-size: 50%;
   pointer-events: none;
   transition: background-color 0.4s ease; /* плавная смена цвета при переключении трека */
 }
@@ -3304,3 +3304,7 @@ div:has(> img[src*="liked-songs"])::after {
 
 
 .playback-bar {position: relative !important; display: block !important; --playback-bar-grid-gap: 8px !important; -webkit-box-orient: horizontal !important; -webkit-box-direction: normal !important; -webkit-box-pack: justify !important; -webkit-box-align: center !important; align-items: center !important; display: -webkit-box !important; display: flex !important; flex-direction: row !important; gap: var(--playback-bar-grid-gap) !important; justify-content: space-between !important; height: 12px !important;} .x-progressBar-progressBarBg {--progress-bar-height: 6px !important; --progress-bar-radius: 10px !important;} :root .Root__now-playing-bar .playback-bar > div {height: 17.59px !important;} .player-controls__buttons--new-icons { margin-bottom: 12px !importan;} .main-nowPlayingBar-nowPlayingBar {padding-bottom: 0px !important;}
+
+.P20_GxRNkSMJmWYu {
+	display: inline-block;
+}

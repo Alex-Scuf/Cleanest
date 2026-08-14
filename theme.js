@@ -1671,16 +1671,46 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		/* Real elements attached to <body> (not inside the sidebar's DOM
 		   tree), so the sidebar's own overflow clipping can't cut off the
 		   glow at its edge. Position/size is synced to the cover art via JS. */
+		/* The clipping window: native overflow:hidden crops the glow layer
+		   inside it. Spans the whole viewport by default (no visible
+		   clipping effect) — its top edge only gets pulled down to the
+		   header's bottom edge when the sidebar is actually scrolled (see
+		   npvAmbience() below), which is what stops the glow from painting
+		   over the header once the cover scrolls up behind it. */
+		.npv-ambience-glow-clip {
+			position: fixed;
+			overflow: hidden;
+			pointer-events: none;
+			z-index: 9999;
+		}
 		.npv-ambience-glow-layer {
 			content: "";
-			position: fixed;
+			position: absolute;
 			pointer-events: none;
 			background-position: center;
 			background-size: cover;
 			background-repeat: no-repeat;
-			transition: background 0.5s ease, opacity 0.5s ease;
+			/* transition used to be the "background" shorthand, which also
+			   covers background-position and background-size — not just
+			   background-image. Those two are rewritten every frame (cover
+			   tracking, reactive size pulse), so the shorthand was making
+			   them visibly ease toward their target over half a second
+			   instead of snapping — that's what looked like lag, even with
+			   the cover itself sitting still. Scoping the transition to
+			   just background-image keeps the smooth crossfade on track
+			   change while position/size apply instantly. */
+			transition: background-image 0.5s ease, opacity 0.5s ease;
 			opacity: var(--npv-ambience-opacity, 0);
-			z-index: 9999;
+		}
+
+		/* Modals (e.g. the settings window) were rendering BEHIND the ambience
+		   glow / edge glow, which both sit at very high z-index on purpose
+		   (attached straight to <body>, need to stay above the app's own
+		   panels). Spotify's own dialogs default to z-index:100, which loses
+		   to both. Dialogs should always win over decorative effects, so
+		   this is pushed above the higher of the two (edge glow, 999999). */
+		.GenericModal__overlay {
+			z-index: 1000000 !important;
 		}
 
 		/* One blurred/tinted element for the whole frame, with a clip-path
@@ -1691,7 +1721,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 
 		/* compatibility: since spotify 1.2.87; spicetify v2.42.2 */
 		.Root__right-sidebar aside .main-nowPlayingView-headerContainer {
-			position: absolute;
+			position: relative;
 			width: 100%;
 			z-index: 1;
 			background: transparent;
@@ -1827,11 +1857,23 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		return 8; // sane fallback if nothing reports a radius
 	}
 
+	// Wrapping the glow in its own clipping window rather than appending it
+	// straight to <body>: this wrapper's box (native overflow: hidden) is
+	// what enforces the "don't paint above the header once scrolled" rule
+	// now, instead of folding that into the clip-path used for the cover
+	// art cutout. clip-path combined with filter: blur() on the same
+	// element, recalculated every frame, turned out to be unreliable for
+	// this — switching to plain overflow clipping on a separate element
+	// removes that risk entirely (overflow: hidden has no path syntax to
+	// get wrong).
 	function makeLayerSet(modifierClass) {
+		const wrapper = document.createElement("div");
+		wrapper.className = "npv-ambience-glow-clip";
 		const el = document.createElement("div");
 		el.className = `npv-ambience-glow-layer ${modifierClass}`;
-		document.body.appendChild(el);
-		return el;
+		wrapper.appendChild(el);
+		document.body.appendChild(wrapper);
+		return { wrapper, el };
 	}
 
 	const layers = makeLayerSet("npv-ambience-glow-layer--tint");
@@ -1970,8 +2012,8 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		// into a flat, textureless smear instead of a soft colorful glow.
 		const url = metadata.image_xlarge_url || metadata.image_large_url || metadata.image_url;
 		const bg = `url(${url})`;
-		for (const el of allLayers) {
-			el.style.backgroundImage = bg;
+		for (const layer of allLayers) {
+			layer.el.style.backgroundImage = bg;
 		}
 	}
 
@@ -2003,7 +2045,6 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 
 	let lastRectKey = "";
 	let lastWrittenBrightness = "";
-	let frameCounter = 0;
 
 	// Single combined loop for both effects. They used to be two separate
 	// requestAnimationFrame loops, each independently calling
@@ -2092,16 +2133,25 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		smoothedSizeMult += (targetSizeMult - smoothedSizeMult) * (isPaused ? 1 : sizeSmoothing);
 		const spread = Math.min(Math.max(baseSpread * smoothedSizeMult, 2), 200);
 
-		// Geometry/background writes stay throttled to ~30fps — still the
-		// expensive part (layout + repainting several blurred elements).
-		frameCounter++;
-		if (frameCounter % 2 !== 0) {
-			requestAnimationFrame(masterLoop);
-			return;
-		}
-
+		// Geometry/background writes used to be throttled to ~30fps to save
+		// on layout+repaint cost — but that meant the glow visibly lagged
+		// half a frame behind the cover art during any fast movement
+		// (resizing, scrolling, NPV open/close animations), which looked
+		// broken rather than just "slightly less smooth". Running this
+		// every frame costs more, but keeps the glow rigidly attached to
+		// the cover regardless of how fast it's moving.
 		const rect = cover.getBoundingClientRect();
-		const key = `${rect.top}|${rect.left}|${rect.width}|${rect.height}|${spread.toFixed(1)}`;
+		// The sidebar's own overlayscrollbars viewport exposes a `fade`
+		// attribute (bottom / full / top) that already tracks exactly
+		// whether it's scrolled — "bottom" means resting at the very top
+		// (nothing scrolled past yet, cover sits at its normal spot,
+		// nowhere near the header), while "full"/"top" mean content has
+		// scrolled down, which is when the cover can end up behind the
+		// header. Using this directly instead of computing our own
+		// visibility/clipping heuristics.
+		const viewportEl = document.querySelector(".Root__right-sidebar [data-overlayscrollbars-viewport]");
+		const fade = viewportEl ? viewportEl.getAttribute("fade") : null;
+		const key = `${rect.top}|${rect.left}|${rect.width}|${rect.height}|${spread.toFixed(1)}|${fade}`;
 		if (key !== lastRectKey) {
 			lastRectKey = key;
 			const outerW = rect.width + spread * 2;
@@ -2127,20 +2177,50 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			// left a small square gap where neither the (rounded) artwork
 			// nor the (square-holed) glow painted anything, showing raw
 			// dark background through as black corner notches.
+			// (Header-scroll clipping used to also live in this same
+			// clip-path — combining that with filter: blur() on the same
+			// element, recomputed every frame, turned out to be unreliable.
+			// It's handled by the wrapper's plain overflow:hidden instead
+			// now — see below — so this path only ever does the cover cutout.)
 			const pad = Math.max(spread * 4, 200);
 			const cornerRadius = getCoverCornerRadius(cover);
 			const outerPath = `M${-pad},${-pad} L${outerW + pad},${-pad} L${outerW + pad},${outerH + pad} L${-pad},${outerH + pad} Z`;
 			const innerPath = roundedRectPathData(spread, spread, rect.width, rect.height, cornerRadius);
 			const clipPath = `path(evenodd, "${outerPath} ${innerPath}")`;
 
-			for (const el of allLayers) {
-				el.style.top = `${outerTop}px`;
-				el.style.left = `${outerLeft}px`;
-				el.style.width = `${outerW}px`;
-				el.style.height = `${outerH}px`;
-				el.style.backgroundSize = bgSize;
-				el.style.backgroundPosition = "0px 0px";
-				el.style.clipPath = clipPath;
+			// The wrapper's own box is the actual clip boundary now (plain
+			// overflow: hidden, no path syntax involved). Generously huge
+			// by default so it never restricts anything; its top edge only
+			// gets pulled down to the header's bottom edge when fade says
+			// content is scrolled.
+			const FAR = 100000;
+			let wrapperTop = -FAR;
+			if (fade === "full" || fade === "top") {
+				const header = document.querySelector(".Root__right-sidebar .main-nowPlayingView-headerContainer");
+				if (header) {
+					wrapperTop = header.getBoundingClientRect().bottom;
+				}
+			}
+			const wrapperLeft = -FAR;
+			const wrapperWidth = FAR * 2;
+			const wrapperHeight = FAR * 2;
+
+			for (const layer of allLayers) {
+				layer.wrapper.style.top = `${wrapperTop}px`;
+				layer.wrapper.style.left = `${wrapperLeft}px`;
+				layer.wrapper.style.width = `${wrapperWidth}px`;
+				layer.wrapper.style.height = `${wrapperHeight}px`;
+				// el's position is relative to the wrapper now (position:
+				// absolute inside a position:fixed wrapper), so it has to be
+				// expressed as an offset from the wrapper's own top-left,
+				// not raw viewport coordinates.
+				layer.el.style.top = `${outerTop - wrapperTop}px`;
+				layer.el.style.left = `${outerLeft - wrapperLeft}px`;
+				layer.el.style.width = `${outerW}px`;
+				layer.el.style.height = `${outerH}px`;
+				layer.el.style.backgroundSize = bgSize;
+				layer.el.style.backgroundPosition = "0px 0px";
+				layer.el.style.clipPath = clipPath;
 			}
 		}
 		document.documentElement.style.setProperty("--npv-ambience-opacity", rect.width > 0 ? 1 : 0);

@@ -106,7 +106,9 @@ Recommended tracks at the end of the playlist/album
 These are all the settings for now:
 </div>
 <p align=center>
-<img width="940" height="765" alt="Снимок экрана 2026-08-13 111755" src="https://github.com/user-attachments/assets/378bf0d0-7015-446f-9eae-00e96d25f47a" />
+ 
+<img width="929" height="722" alt="Снимок экрана 2026-08-15 140328" src="https://github.com/user-attachments/assets/ded85640-2250-48af-a813-d7c17a2c52ab" />
+
 
 
 </p>

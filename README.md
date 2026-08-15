@@ -1,4 +1,4 @@
-<h1 align=center>Cleanest</h1>
+ <h1 align=center>Cleanest</h1>
 <P align=center>A Spicetify theme based on the <a href="https://github.com/Astromations/Hazy">"Hazy"</a> theme
   <BR>An ultra-clean theme</BR></P>
 
@@ -11,7 +11,7 @@
 
 <img width="1910" height="1039" alt="preview7" src="https://github.com/user-attachments/assets/a637ea6f-1f28-423f-957b-19fe1ca6cb87" />
 
-<img width="1920" height="1041" alt="preview4" src="https://github.com/user-attachments/assets/65287a69-bade-4872-b247-8eba47ad6204" />
+<img width="1916" height="1030" alt="preview9" src="https://github.com/user-attachments/assets/7719cefe-21bf-44ab-bef3-12b4d3295132" />
 
 <img width="1914" height="1035" alt="preview6" src="https://github.com/user-attachments/assets/dafea5a2-8102-4deb-a328-f8d157866166" />
 

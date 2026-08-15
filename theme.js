@@ -31,6 +31,12 @@
       defVal: false,
       group: "theme",
     },
+    {
+      id: "LikedHeartRecolor",
+      name: "Custom \"Liked Songs\" art",
+      defVal: true,
+      group: "theme",
+    },
     // Toggleable NPV sections — all default to hidden (true) to match what
     // was previously hardcoded off in user.css, so nothing changes visually
     // on first load; now it's just switchable instead of permanent.
@@ -122,7 +128,7 @@
     },
     {
       id: "AmbienceReactive",
-      name: "Ambience reacts to music loudness",
+      name: "Animated Ambience",
       defVal: true,
       group: "ambience",
       animated: true,
@@ -154,7 +160,7 @@
     },
     {
       id: "EdgeGlowReactive",
-      name: "Edge glow reacts to music loudness",
+      name: "Animated edge glow",
       defVal: true,
       group: "edgeglow",
       animated: true,
@@ -796,6 +802,10 @@
       HideQueueButton: { className: "__cleanest_hide_queue", defVal: false },
       HideConnectDevice: { className: "__cleanest_hide_connectdevice", defVal: false },
       HideWhatsNew: { className: "__cleanest_hide_whatsnew", defVal: false },
+      // Not a "hide" toggle like the rest — class is present when the
+      // effect is ENABLED (default), so the user.css rules should be
+      // scoped with `body.__cleanest_likedheart_recolor`, not `:not()`.
+      LikedHeartRecolor: { className: "__cleanest_likedheart_recolor", defVal: true },
     };
     for (const [id, { className, defVal }] of Object.entries(ELEMENT_TOGGLES)) {
       const stored = localStorage.getItem(id);
@@ -1790,6 +1800,29 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		.main-nowPlayingView-gradient,
 		.IkRGajTjItEFQkRMeH6v.f2UE9n5nZcbgZrGYTU3r {
 			background: none !important;
+		}
+
+		/* Badge-repositioning experiments (re-parenting it into the player
+		   controls row, then absolutely positioning it there) didn't work
+		   out — kept landing in the wrong place / wrong size regardless of
+		   selector precision. Simplest fix: just hide it, it was only
+		   getting in the way. */
+		#wavelink-source-badge {
+			display: none !important;
+		}
+
+		/* Wavelink's own SoundCloud pause-icon overlay (index.js) hardcodes
+		   background-color: #000 for its CSS-mask icon, on the assumption
+		   that the play/pause button still has Spotify's default white
+		   circle behind it. Cleanest makes that button transparent
+		   (.main-playPauseButton-button { background-color: transparent })
+		   and colors its icons with var(--spice-text) everywhere else — so
+		   against a transparent/dark button, Wavelink's hardcoded black
+		   icon is invisible instead of just "a dark icon on white". Matching
+		   the same var(--spice-text) used for every other transport button
+		   fixes contrast without touching Wavelink's own files. */
+		body.sc-playing [data-testid="control-button-playpause"]::after {
+			background-color: var(--spice-text) !important;
 		}
 	`;
 	document.head.appendChild(style);

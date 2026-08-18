@@ -166,6 +166,248 @@
       animated: true,
     },
   ];
+
+  // Single source of truth for the "advanced" shadow/decoration toggles —
+  // used both to build ELEMENT_TOGGLES (persistence + initial body class,
+  // in loadToggles() below) and to render the advanced modal's rows, so the
+  // className can never drift out of sync between the two like a derived/
+  // regex version could. Declared up here (not next to openAdvancedThemeModal
+  // itself, further down) because loadToggles() — which reads this — runs
+  // long before that point in the file.
+  /* The native .main-trackCreditsModal-closeBtn kept rendering way outside
+     the modal (confirmed via DevTools — its highlight box showed up over
+     the mini-player area, nowhere near our header), almost certainly due
+     to some Encore component CSS layer setting position: fixed/absolute
+     on it that our rules can't out-specificity. Rather than keep chasing
+     that, just hide it and drop in a plain button of our own inside the
+     header — as a normal flex child it automatically lands next to the
+     centered title with no positioning tricks needed. Polling briefly
+     because PopupModal's content isn't necessarily attached to the
+     document the instant display() returns. Takes the modal's aria-label
+     so it works for any PopupModal we open, not just one hardcoded one. */
+  function attachCleanestCloseBtn(modalAriaLabel, attempt = 0) {
+    const header = document.querySelector(
+      `div[aria-label="${modalAriaLabel}"] .main-trackCreditsModal-header`
+    );
+    const nativeClose = header?.querySelector(".main-trackCreditsModal-closeBtn");
+    if (header && nativeClose) {
+      nativeClose.style.setProperty("display", "none", "important");
+      if (!header.querySelector(".cleanestCloseBtn")) {
+        const closeBtn = document.createElement("button");
+        closeBtn.className = "cleanestCloseBtn";
+        closeBtn.type = "button";
+        closeBtn.setAttribute("aria-label", "Close");
+        closeBtn.innerHTML = "&#10005;";
+        closeBtn.onclick = () => nativeClose.click();
+        header.appendChild(closeBtn);
+      }
+      return;
+    }
+    if (attempt < 20) setTimeout(() => attachCleanestCloseBtn(modalAriaLabel, attempt + 1), 50);
+  }
+
+  // Shadow/decoration toggles. No settings UI exposes these anymore (in
+  // either modal) — they're permanently fixed at their defVal below,
+  // matching how they behaved before any toggle UI for them existed.
+  // Still folded into ELEMENT_TOGGLES so the body classes get applied
+  // consistently at startup, same mechanism as everything else, just
+  // with no way to change the value from the UI.
+  const SHADOW_TOGGLES = [
+    { id: "ShowSidebarShadow", name: "Sidebar shadow", className: "__cleanest_show_sidebar_shadow" },
+    { id: "ShowCardShadows", name: "Card shadows", className: "__cleanest_show_card_shadows" },
+    // Unlike the others (which were previously hidden, off by default),
+    // this text-shadow is currently always ON — so this one toggle defaults
+    // to true, to match what's already live instead of changing it.
+    { id: "ShowTrackTitleTextShadow", name: "Track title text shadow", className: "__cleanest_show_tracktitle_textshadow", defVal: true },
+    { id: "ShowDjTint", name: "\"Up next\" DJ tint background", className: "__cleanest_show_dj_tint" },
+    { id: "ShowChipBackground", name: "Filter chip background", className: "__cleanest_show_chip_background" },
+    { id: "ShowRelatedVideosShelf", name: "Related music videos shelf", className: "__cleanest_show_related_videos" },
+    { id: "ShowPlaylistButtonShadow", name: "Playlist/podcast button shadow", className: "__cleanest_show_playlistbutton_shadow" },
+    { id: "ShowArtistHeaderShadow", name: "Artist header shadow", className: "__cleanest_show_artistheader_shadow" },
+    { id: "ShowTrackListHeaderShadow", name: "Track list header shadow", className: "__cleanest_show_tracklistheader_shadow" },
+    { id: "ShowTopBarFriendActivityShadow", name: "Top bar friend activity shadow", className: "__cleanest_show_topbar_friendactivity_shadow" },
+    { id: "ShowLibraryRowImageShadow", name: "Library row image shadow", className: "__cleanest_show_libraryrow_shadow" },
+    { id: "ShowHomeShortcutsShadow", name: "Home shortcut tiles shadow", className: "__cleanest_show_homeshortcuts_shadow" },
+    { id: "ShowSidebarHeaderShadow", name: "Sidebar header shadow", className: "__cleanest_show_sidebarheader_shadow" },
+  ];
+
+  const ADVANCED_TOGGLES = [
+    // Compatibility toggles — gate CSS/JS written specifically to smooth
+    // over conflicts with other, separately-installed mods. Split into one
+    // sub-toggle per individual tweak (not one master switch per mod), so
+    // each can be turned off independently for finer control. All default
+    // ON since the rules they gate were already unconditionally active
+    // before these toggles existed.
+    { id: "SpicyLyricsBgTint", name: "Neutralize background tint", className: "__cleanest_compat_spicylyrics_bgtint", defVal: true, category: "compat", mod: "Spicy Lyrics" },
+    { id: "SpicyLyricsCardShadow", name: "Remove NPV card shadow", className: "__cleanest_compat_spicylyrics_cardshadow", defVal: true, category: "compat", mod: "Spicy Lyrics" },
+    { id: "SpicyLyricsHideDynamicBg", name: "Hide Spicy Lyrics' own dynamic background", className: "__cleanest_compat_spicylyrics_hidedynamicbg", defVal: true, category: "compat", mod: "Spicy Lyrics" },
+    { id: "WavelinkCoverSync", name: "Cover art sync", className: "__cleanest_compat_wavelink_cover", defVal: true, category: "compat", mod: "Wavelink" },
+    { id: "WavelinkAccentSync", name: "Accent color sync", className: "__cleanest_compat_wavelink_accent", defVal: true, category: "compat", mod: "Wavelink" },
+    { id: "WavelinkBackgroundSync", name: "Panel background sync", className: "__cleanest_compat_wavelink_bgsync", defVal: true, category: "compat", mod: "Wavelink" },
+    { id: "WavelinkTopbarTransparent", name: "Transparent top bar", className: "__cleanest_compat_wavelink_topbar", defVal: true, category: "compat", mod: "Wavelink" },
+  ];
+
+  // Panel background color/opacity customization. Each panel's CSS rule
+  // (in user.css) reads its own --cleanest-bg-* custom property with a
+  // fallback matching its current hardcoded value, so nothing changes
+  // visually until the user actually touches a control.
+  const PANEL_BACKGROUNDS = [
+    { id: "SidebarBg", name: "Right sidebar", cssVar: "--cleanest-bg-sidebar", defaultHex: "#0a0a0a", defaultAlpha: 0 },
+    { id: "LibraryBg", name: "Library entry points", cssVar: "--cleanest-bg-library", defaultHex: "#000000", defaultAlpha: 0 },
+    { id: "MainViewBg", name: "Main view", cssVar: "--cleanest-bg-mainview", defaultHex: "#000000", defaultAlpha: 0 },
+    { id: "NowPlayingBarBg", name: "Now playing bar", cssVar: "--cleanest-bg-nowplayingbar", defaultHex: "#000000", defaultAlpha: 0 },
+    { id: "GlobalNavBg", name: "Top nav bar", cssVar: "--cleanest-bg-globalnav", defaultHex: "#000000", defaultAlpha: 0 },
+  ];
+
+  function hexToRgba(hex, alphaPct) {
+    const r = Number.parseInt(hex.slice(1, 3), 16);
+    const g = Number.parseInt(hex.slice(3, 5), 16);
+    const b = Number.parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alphaPct / 100})`;
+  }
+
+  function applyPanelBackground(panel) {
+    const hex = localStorage.getItem(`${panel.id}Color`) || panel.defaultHex;
+    const storedAlpha = localStorage.getItem(`${panel.id}Alpha`);
+    const alpha = storedAlpha === null ? panel.defaultAlpha : Number(storedAlpha);
+    document.documentElement.style.setProperty(panel.cssVar, hexToRgba(hex, alpha));
+  }
+
+  function applyAllPanelBackgrounds() {
+    PANEL_BACKGROUNDS.forEach(applyPanelBackground);
+  }
+  applyAllPanelBackgrounds();
+
+  function openAdvancedThemeModal() {
+    const content = document.createElement("div");
+    content.classList.add("cleanestAdvancedModal");
+
+    const note = document.createElement("p");
+    note.classList.add("cleanestAdvancedNote");
+    note.textContent =
+      "These control compatibility tweaks for other mods. Changes apply immediately — no Apply/Save needed here.";
+    content.append(note);
+
+    const bgHeader = document.createElement("h3");
+    bgHeader.classList.add("cleanestSectionHeader");
+    bgHeader.textContent = "Panel backgrounds";
+    content.append(bgHeader);
+
+    for (const panel of PANEL_BACKGROUNDS) {
+      const row = document.createElement("div");
+      row.classList.add("cleanestOptionRow", "cleanestBgRow");
+      row.setAttribute("name", panel.id);
+
+      const label = document.createElement("span");
+      label.classList.add("cleanestOptionDesc");
+      label.textContent = `${panel.name}:`;
+
+      const controls = document.createElement("span");
+      controls.classList.add("cleanestBgControls");
+
+      const colorInput = document.createElement("input");
+      colorInput.type = "color";
+      colorInput.value = localStorage.getItem(`${panel.id}Color`) || panel.defaultHex;
+
+      const alphaInput = document.createElement("input");
+      alphaInput.type = "range";
+      alphaInput.min = "0";
+      alphaInput.max = "100";
+      alphaInput.step = "1";
+      const storedAlpha = localStorage.getItem(`${panel.id}Alpha`);
+      alphaInput.value = storedAlpha === null ? panel.defaultAlpha : storedAlpha;
+
+      const alphaValue = document.createElement("span");
+      alphaValue.classList.add("cleanestBgAlphaValue");
+      alphaValue.textContent = `${alphaInput.value}%`;
+
+      const update = () => {
+        localStorage.setItem(`${panel.id}Color`, colorInput.value);
+        localStorage.setItem(`${panel.id}Alpha`, alphaInput.value);
+        alphaValue.textContent = `${alphaInput.value}%`;
+        applyPanelBackground(panel);
+      };
+      colorInput.addEventListener("input", update);
+      alphaInput.addEventListener("input", update);
+
+      controls.append(colorInput, alphaInput, alphaValue);
+      row.append(label, controls);
+      content.append(row);
+    }
+
+    const CATEGORY_HEADERS = {
+      compat: "Compatibility",
+    };
+
+    let currentCategory = null;
+    let currentMod = null;
+    for (const { id, name, className, defVal, category, mod } of ADVANCED_TOGGLES) {
+      if (category !== currentCategory) {
+        currentCategory = category;
+        currentMod = null;
+        const sectionHeader = document.createElement("h3");
+        sectionHeader.classList.add("cleanestSectionHeader");
+        sectionHeader.textContent = CATEGORY_HEADERS[category] || category;
+        content.append(sectionHeader);
+      }
+      if (mod && mod !== currentMod) {
+        currentMod = mod;
+        const modHeader = document.createElement("h4");
+        modHeader.classList.add("cleanestSubHeader", "cleanestModHeader");
+        modHeader.textContent = mod;
+        content.append(modHeader);
+      }
+      const row = document.createElement("div");
+      row.classList.add("cleanestOptionRow");
+      row.setAttribute("name", id);
+      row.innerHTML = `
+      <span class="cleanestOptionDesc">${name}:</span>
+      <button class="cleanestOptionToggle">
+        <span class="toggleWrapper">
+          <span class="toggle"></span>
+        </span>
+      </button>`;
+      const stored = localStorage.getItem(id);
+      const isEnabled = stored === null ? (defVal ?? false) : JSON.parse(stored);
+      row.querySelector(".toggle").classList.toggle("enabled", isEnabled);
+      row.querySelector("button").addEventListener("click", () => {
+        const nowEnabled = !row.querySelector(".toggle").classList.contains("enabled");
+        row.querySelector(".toggle").classList.toggle("enabled", nowEnabled);
+        localStorage.setItem(id, JSON.stringify(nowEnabled));
+        document.body.classList.toggle(className, nowEnabled);
+      });
+      content.append(row);
+    }
+
+    const resetRow = document.createElement("div");
+    resetRow.classList.add("cleanestAdvancedResetRow");
+    const resetButton = document.createElement("button");
+    resetButton.type = "button";
+    resetButton.textContent = "Reset advanced settings";
+    resetButton.classList.add("cleanestAdvancedResetButton");
+    resetButton.addEventListener("click", () => {
+      // Clear every key this modal owns, then re-apply defaults and
+      // re-render in place — simpler and less error-prone than trying to
+      // reset each input's value/UI state by hand one at a time.
+      for (const { id } of ADVANCED_TOGGLES) {
+        localStorage.removeItem(id);
+      }
+      for (const panel of PANEL_BACKGROUNDS) {
+        localStorage.removeItem(`${panel.id}Color`);
+        localStorage.removeItem(`${panel.id}Alpha`);
+      }
+      loadToggles();
+      applyAllPanelBackgrounds();
+      Spicetify.PopupModal.hide();
+      setTimeout(() => openAdvancedThemeModal(), 0);
+    });
+    resetRow.append(resetButton);
+    content.append(resetRow);
+
+    Spicetify.PopupModal.display({ title: "Advanced Theme Settings", content });
+    attachCleanestCloseBtn("Advanced Theme Settings");
+  }
+
   const toggles = {
     UseCustomBackground: false,
     UseCustomColor: false,
@@ -806,6 +1048,17 @@
       // effect is ENABLED (default), so the user.css rules should be
       // scoped with `body.__cleanest_likedheart_recolor`, not `:not()`.
       LikedHeartRecolor: { className: "__cleanest_likedheart_recolor", defVal: true },
+
+      // Generated from ADVANCED_TOGGLES/SHADOW_TOGGLES (defined further
+      // down/above, same outer scope) rather than duplicated here by
+      // hand — same className used by openAdvancedThemeModal()/the main
+      // modal, so they can't drift out of sync.
+      ...Object.fromEntries(
+        ADVANCED_TOGGLES.map(({ id, className, defVal }) => [id, { className, defVal: defVal ?? false }])
+      ),
+      ...Object.fromEntries(
+        SHADOW_TOGGLES.map(({ id, className, defVal }) => [id, { className, defVal: defVal ?? false }])
+      ),
     };
     for (const [id, { className, defVal }] of Object.entries(ELEMENT_TOGGLES)) {
       const stored = localStorage.getItem(id);
@@ -1096,6 +1349,27 @@
       .filter((opt) => opt.group === "theme")
       .forEach((opt) => createSlider(opt, themeColumn));
 
+    const advancedButtonRow = document.createElement("div");
+    advancedButtonRow.classList.add("cleanestOptionRow");
+    const advancedButton = document.createElement("button");
+    advancedButton.textContent = "Advanced theme settings";
+    advancedButton.classList.add("cleanestAdvancedButton");
+    advancedButton.type = "button";
+    advancedButton.addEventListener("click", (e) => {
+      // Without stopPropagation, this click also reaches whatever listener
+      // closes the main modal on outside/backdrop clicks — that was closing
+      // the main modal (expected) but also either preventing the second
+      // PopupModal.display() from taking effect, or opening-then-immediately
+      // -closing it, since PopupModal appears to be a single shared instance.
+      // The setTimeout defers opening the second modal until after the
+      // first one's own close has actually finished, instead of both
+      // fighting over the same modal state in the same tick.
+      e.stopPropagation();
+      setTimeout(() => openAdvancedThemeModal(), 0);
+    });
+    advancedButtonRow.append(advancedButton);
+    themeColumn.append(advancedButtonRow);
+
     addSectionHeader("Ambience Glow", ambienceColumn);
     // Master switch first, un-gated, so it's always usable.
     toggleInfo
@@ -1275,41 +1549,7 @@
     content.append(buttonsRow);
 
     Spicetify.PopupModal.display({ title: "Cleanest Settings", content });
-    /* The native .main-trackCreditsModal-closeBtn kept rendering way
-       outside the modal (confirmed via DevTools — its highlight box
-       showed up over the mini-player area, nowhere near our header),
-       almost certainly due to some Encore component CSS layer setting
-       position: fixed/absolute on it that our rules can't out-specificity.
-       Rather than keep chasing that, just hide it and drop in a plain
-       button of our own inside the header — as a normal flex child it
-       automatically lands next to the centered title with no positioning
-       tricks needed. Polling briefly because PopupModal's content isn't
-       necessarily attached to the document the instant display() returns. */
-    let closeBtnAttempts = 0;
-    const attachCleanestCloseBtn = () => {
-      closeBtnAttempts++;
-      const header = document.querySelector(
-        'div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header'
-      );
-      const nativeClose = header?.querySelector(
-        ".main-trackCreditsModal-closeBtn"
-      );
-      if (header && nativeClose) {
-        nativeClose.style.setProperty("display", "none", "important");
-        if (!header.querySelector(".cleanestCloseBtn")) {
-          const closeBtn = document.createElement("button");
-          closeBtn.className = "cleanestCloseBtn";
-          closeBtn.type = "button";
-          closeBtn.setAttribute("aria-label", "Close");
-          closeBtn.innerHTML = "&#10005;";
-          closeBtn.onclick = () => nativeClose.click();
-          header.appendChild(closeBtn);
-        }
-        return;
-      }
-      if (closeBtnAttempts < 20) setTimeout(attachCleanestCloseBtn, 50);
-    };
-    attachCleanestCloseBtn();
+    attachCleanestCloseBtn("Cleanest Settings");
   });
   homeEdit.element.classList.toggle("hidden", false);
 })();
@@ -1426,6 +1666,76 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			margin-bottom: 2px;
 			padding-bottom: 4px;
 		}
+
+		/* "Advanced theme settings" button + its modal. Deliberately plain —
+		   just enough to be usable, not styled to match anything yet. */
+		.cleanestAdvancedButton {
+			margin-top: 8px;
+			padding: 6px 10px;
+			cursor: pointer;
+			color: var(--spice-text);
+			background: rgba(255, 255, 255, 0.1);
+			border: none;
+			border-radius: 4px;
+			font-size: 0.8125rem;
+		}
+		.cleanestAdvancedButton:hover {
+			background: rgba(255, 255, 255, 0.18);
+		}
+		.cleanestAdvancedModal {
+			width: 100%;
+			padding: 16px;
+		}
+		.cleanestAdvancedNote {
+			font-size: 0.8125rem;
+			color: var(--spice-subtext);
+			margin: 0 0 12px 0;
+		}
+		.cleanestAdvancedModal .cleanestOptionRow {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 6px 0;
+		}
+		.cleanestBgControls {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+		.cleanestBgControls input[type="color"] {
+			border: none;
+			width: 28px;
+			height: 22px;
+			padding: 0;
+			background: none;
+			cursor: pointer;
+		}
+		.cleanestBgControls input[type="range"] {
+			width: 100px;
+		}
+		.cleanestBgAlphaValue {
+			font-size: 0.75rem;
+			color: var(--spice-subtext);
+			min-width: 34px;
+			text-align: right;
+		}
+		.cleanestAdvancedResetRow {
+			margin-top: 16px;
+			padding-top: 10px;
+			border-top: 1px solid rgba(255, 255, 255, 0.1);
+		}
+		.cleanestAdvancedResetButton {
+			padding: 6px 10px;
+			cursor: pointer;
+			color: #ff6b6b;
+			background: rgba(255, 107, 107, 0.12);
+			border: none;
+			border-radius: 4px;
+			font-size: 0.8125rem;
+		}
+		.cleanestAdvancedResetButton:hover {
+			background: rgba(255, 107, 107, 0.22);
+		}
 		.cleanestSubHeader {
 			font-size: 0.75rem;
 			font-weight: 700;
@@ -1433,6 +1743,11 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			letter-spacing: 0.05em;
 			opacity: 0.6;
 			margin-top: 4px;
+		}
+		.cleanestModHeader {
+			margin-top: 10px;
+			padding-left: 4px;
+			border-left: 2px solid rgba(255, 255, 255, 0.15);
 		}
 		.cleanestOptionRow.cleanest-disabled {
 			opacity: 0.4;
@@ -1471,6 +1786,22 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			height: auto !important;
 			max-height: 85vh !important;
 		}
+		/* Same treatment for the Advanced Theme Settings modal — it grew a
+		   lot of rows (panel backgrounds + shadows + compatibility) and was
+		   overflowing above the top of the window without a height cap. */
+		div[aria-label="Advanced Theme Settings"] .main-trackCreditsModal-container {
+			width: 640px !important;
+			max-width: 96vw !important;
+			height: auto !important;
+			max-height: 85vh !important;
+		}
+		div[aria-label="Advanced Theme Settings"] .main-trackCreditsModal-mainSection {
+			overflow-y: auto !important;
+			height: auto !important;
+			max-height: 85vh !important;
+			padding-top: 12px !important;
+			padding-bottom: 12px !important;
+		}
 		/* user.css sets this section to overflow-y: hidden (content just got
 		   clipped if it didn't fit); switching to auto lets a shorter modal
 		   scroll internally instead of being forced to grow tall enough to
@@ -1488,6 +1819,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		}
 		.cleanestSettingsColumns {
 			display: flex;
+			flex-wrap: wrap;
 			gap: 18px;
 			align-items: flex-start;
 			margin-top: 4px;
@@ -1532,19 +1864,22 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		   header a flex row, pinning the button to auto width, and letting
 		   the title fill+center in the remaining space fixes both the
 		   centering and the button position in one go. */
-		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header {
+		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header,
+		div[aria-label="Advanced Theme Settings"] .main-trackCreditsModal-header {
 			display: flex !important;
 			align-items: center !important;
 			justify-content: space-between !important;
 			gap: 12px !important;
 		}
-		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header h1 {
+		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header h1,
+		div[aria-label="Advanced Theme Settings"] .main-trackCreditsModal-header h1 {
 			flex: 1 1 auto !important;
 			text-align: center !important;
 			margin: 0 !important;
 			pointer-events: none !important;
 		}
-		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header .cleanestCloseBtn {
+		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header .cleanestCloseBtn,
+		div[aria-label="Advanced Theme Settings"] .main-trackCreditsModal-header .cleanestCloseBtn {
 			flex: 0 0 auto !important;
 			display: flex !important;
 			align-items: center !important;
@@ -1561,7 +1896,8 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			line-height: 1 !important;
 			cursor: pointer !important;
 		}
-		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header .cleanestCloseBtn:hover {
+		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-header .cleanestCloseBtn:hover,
+		div[aria-label="Advanced Theme Settings"] .main-trackCreditsModal-header .cleanestCloseBtn:hover {
 			background: rgba(255, 255, 255, 0.1) !important;
 		}
 
@@ -2037,13 +2373,175 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		return seg.loudness_max + (loudEnd - seg.loudness_max) * p;
 	}
 
+	// Wavelink plays audio through a plain <audio id="wavelink-audio">
+	// element sourced from SoundCloud's CDN, which does not send CORS
+	// headers. Attaching a Web Audio AnalyserNode to it (via
+	// createMediaElementSource) was tried for real frequency-based
+	// "punch" data, but two things ruled that out for good:
+	//   1. A CORS-tainted source makes getByteFrequencyData() return all
+	//      zeros forever — no usable data, confirmed via logging.
+	//   2. createMediaElementSource() permanently reroutes the element's
+	//      audio output through the Web Audio graph. If anything in that
+	//      graph misbehaves (suspended context, routing conflict with
+	//      Wavelink's own playback handling, etc.), the track's audio
+	//      goes silent with no way to reconnect the element back to its
+	//      normal output — this is exactly what caused playback to cut
+	//      out entirely and require a full Spotify restart.
+	// So Wavelink tracks never get real audio-reactive data. Ambience/edge
+	// glow falls back to static brightness for them instead — see the
+	// `scActive` checks in masterLoop() below. No AnalyserNode, no
+	// createMediaElementSource, no touching #wavelink-audio's output path
+	// at all, so this can't take down playback again.
+
+	// Wavelink (a separate custom app for playing SoundCloud etc. through
+	// Spotify's UI) takes over the now-playing bar/panel when active — it
+	// marks this with `body.sc-active`, and injects its own <img> elements
+	// (some tagged [data-wl-owned]) into the exact same cover-art containers
+	// this file already watches, showing the REAL currently-playing track's
+	// artwork. Spotify's own Player metadata doesn't know about this at
+	// all (Spotify has no idea a SoundCloud track is playing), so reading
+	// metadata.image_xlarge_url etc. during Wavelink playback would color
+	// the glow using whatever Spotify track was playing last — stale and
+	// often just wrong. Reading the actual rendered <img> instead sidesteps
+	// needing to know how Wavelink internally fetches/caches artwork; it
+	// just reflects whatever's really on screen right now.
+
+	// Minimal, self-contained restore of the normal Spotify-track-driven
+	// background (--image_url) — deliberately NOT calling the "real"
+	// getCurrentBackground()/onSongChange() from the main settings IIFE,
+	// since those live in a completely separate closure and aren't
+	// reachable from here (that mismatch is what silently threw and broke
+	// this in the first place). This skips the "Custom background" toggle
+	// check that version has, but a genuine Spotify songchange firing
+	// shortly after Wavelink releases control will correct that anyway via
+	// its own normal path — this only needs to cover the brief gap.
+	function restoreSpotifyBackground() {
+		const url = Spicetify?.Player?.data?.item?.metadata?.image_url;
+		if (!url) return;
+		const resolved = url.replace("spotify:image:", "https://i.scdn.co/image/");
+		document.documentElement.style.setProperty("--image_url", `url("${resolved}")`);
+	}
+
+	// Self-contained duplicate of the main settings IIFE's accent-color
+	// extraction (findColor/isTooDark/isTooCloseToWhite/rgbToHex) — that
+	// version lives in a separate closure and isn't reachable from here,
+	// same reason restoreSpotifyBackground() above is its own minimal
+	// copy rather than a call into onSongChange(). Every element that
+	// colors itself off the current track (liked-songs heart, buttons,
+	// edge glow, etc.) reads the --spice-accent/--spice-button/
+	// --spice-button-active CSS custom properties rather than recomputing
+	// anything itself, so writing those three here is enough to make all
+	// of them follow Wavelink's cover art too — no per-element changes
+	// needed elsewhere.
+	function isColorTooDark(rgb) {
+		const brightness = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
+		return brightness < 100;
+	}
+	function isColorTooCloseToWhite(rgb) {
+		return rgb.r > 200 && rgb.g > 200 && rgb.b > 200;
+	}
+	function rgbToHexLocal(r, g, b) {
+		return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
+	}
+	function findDominantColor(rgbList, skipFilters = false) {
+		const colorCount = {};
+		let maxColor = "";
+		let maxCount = 0;
+		for (let i = 0; i < rgbList.length; i++) {
+			if (!skipFilters && (isColorTooDark(rgbList[i]) || isColorTooCloseToWhite(rgbList[i]))) continue;
+			const key = `${rgbList[i].r},${rgbList[i].g},${rgbList[i].b}`;
+			colorCount[key] = (colorCount[key] || 0) + 1;
+			if (colorCount[key] > maxCount) {
+				maxColor = key;
+				maxCount = colorCount[key];
+			}
+		}
+		return maxColor ? rgbToHexLocal(...maxColor.split(",").map(Number)) : null;
+	}
+	function setAccentColorVars(hex) {
+		document.documentElement.style.setProperty("--spice-button", hex);
+		document.documentElement.style.setProperty("--spice-button-active", hex);
+		document.documentElement.style.setProperty("--spice-accent", hex);
+	}
+	// Throttled diagnostic — SoundCloud's image CDN generally does send
+	// CORS headers (unlike the audio CDN, which is what broke playback
+	// earlier), but if a particular image doesn't, drawing it to canvas
+	// taints the canvas and getImageData() throws. That's caught below and
+	// just skipped — leaves whatever accent color was already set rather
+	// than crashing anything, since this whole path only ever reads a
+	// plain <img>'s pixels and never touches audio.
+	let _accentErrLastLog = 0;
+	function extractDominantColor(url, callback) {
+		if (!url) return;
+		const img = new Image();
+		img.crossOrigin = "Anonymous";
+		img.onload = function () {
+			try {
+				const canvas = document.createElement("canvas");
+				const ctx = canvas.getContext("2d");
+				canvas.width = img.width;
+				canvas.height = img.height;
+				ctx.drawImage(img, 0, 0);
+				const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+				const rgbList = [];
+				for (let i = 0; i < data.length; i += 4) {
+					rgbList.push({ r: data[i], g: data[i + 1], b: data[i + 2] });
+				}
+				const hex = findDominantColor(rgbList) || findDominantColor(rgbList, true);
+				if (hex) callback(hex);
+			} catch (err) {
+				const now = Date.now();
+				if (now - _accentErrLastLog > 5000) {
+					_accentErrLastLog = now;
+					console.log("[Cleanest/Wavelink] accent color extraction failed (likely CORS-tainted image):", err);
+				}
+			}
+		};
+		img.src = url;
+	}
+	// Mirrors restoreSpotifyBackground()'s minimal-restore approach: once
+	// Spotify has real playback again, recompute accent color from its
+	// current track image directly, rather than waiting on onSongChange()
+	// in the other closure (which won't refire if the same Spotify track
+	// was already loaded before Wavelink took over).
+	function restoreSpotifyAccentColor() {
+		const url = Spicetify?.Player?.data?.item?.metadata?.image_url;
+		if (!url) return;
+		const resolved = url.replace("spotify:image:", "https://i.scdn.co/image/");
+		extractDominantColor(resolved, setAccentColorVars);
+	}
+
+	// The actual on-screen cover art element/src lookup, independent of any
+	// toggle — Cover art sync and Panel background sync are separate
+	// features with separate toggles, and each should work regardless of
+	// whether the other is enabled. (Previously background sync went
+	// through getEffectiveCoverUrl(), which itself gates on the Cover art
+	// sync toggle — turning that off made background sync silently fall
+	// back to Spotify's stale/often-empty metadata URL instead of just
+	// being independent of it.)
+	function getWavelinkRenderedCoverUrl() {
+		if (!document.body.classList.contains("sc-active")) return null;
+		const cover = document.querySelector(".main-nowPlayingView-coverArtContainer");
+		const img = cover?.querySelector("img[data-wl-owned], img.cover-art-image, img");
+		return img?.currentSrc || img?.src || null;
+	}
+
+	function getEffectiveCoverUrl(metadata) {
+		const wavelinkCoverSyncEnabled = document.body.classList.contains("__cleanest_compat_wavelink_cover");
+		if (wavelinkCoverSyncEnabled) {
+			const src = getWavelinkRenderedCoverUrl();
+			if (src) return src;
+		}
+		return metadata.image_xlarge_url || metadata.image_large_url || metadata.image_url;
+	}
+
 	function setImage(metadata) {
 		// Using the full-res image here on purpose: at larger Spread values
 		// the source gets stretched over a much bigger virtual canvas (see
 		// the "windowing" technique in syncPosition below) before being
 		// blurred — a smaller source image stretched that far washes out
 		// into a flat, textureless smear instead of a soft colorful glow.
-		const url = metadata.image_xlarge_url || metadata.image_large_url || metadata.image_url;
+		const url = getEffectiveCoverUrl(metadata);
 		const bg = `url(${url})`;
 		for (const layer of allLayers) {
 			layer.el.style.backgroundImage = bg;
@@ -2078,6 +2576,10 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 
 	let lastRectKey = "";
 	let lastWrittenBrightness = "";
+	let lastEffectiveCoverUrl = "";
+	let wavelinkOwnsBackground = false;
+	let wavelinkOwnsAccentColor = false;
+	let lastWlAccentUrl = null;
 
 	// Single combined loop for both effects. They used to be two separate
 	// requestAnimationFrame loops, each independently calling
@@ -2088,16 +2590,34 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 	// that regardless of how many effects are active at once.
 	function masterLoop() {
 		const rootStyle = getComputedStyle(document.documentElement);
-		const isPaused = !!(Spicetify.Player.data && Spicetify.Player.data.isPaused);
+		// Spicetify.Player.data.isPaused reflects Spotify's OWN player —
+		// Spotify has no idea Wavelink is playing a SoundCloud track, so
+		// that flag stays true the whole time and silently gates off all
+		// reactive glow logic below. While Wavelink actually owns playback
+		// (sc-active), trust the real <audio id="wavelink-audio"> element's
+		// .paused state instead.
+		let isPaused = !!(Spicetify.Player.data && Spicetify.Player.data.isPaused);
+		if (document.body.classList.contains("sc-active")) {
+			const wlAudioEl = document.getElementById("wavelink-audio");
+			isPaused = wlAudioEl ? wlAudioEl.paused : true;
+		}
 		const posSec = getPrecisePositionMs() / 1000;
+		// No real audio-reactive data source exists for Wavelink tracks
+		// (see the big comment above getWavelinkRenderedCoverUrl/the old
+		// AnalyserNode block) — CORS blocks real analysis, and trying to
+		// tap the element's audio graph directly risked killing playback.
+		// So both reactive blocks below treat Wavelink playback as
+		// unconditionally non-reactive and fall back to static brightness,
+		// regardless of the Reactive toggle's setting.
+		const scActive = document.body.classList.contains("sc-active");
 
 		// --- Edge glow: cheap, always runs regardless of NPV state ---
 		const edgeEnabled = rootStyle.getPropertyValue("--npv-edge-glow-enabled").trim() !== "0";
-		const edgeReactive = rootStyle.getPropertyValue("--npv-edge-glow-reactive-enabled").trim() !== "0";
+		const edgeReactive = rootStyle.getPropertyValue("--npv-edge-glow-reactive-enabled").trim() !== "0" && !scActive;
 		let edgeTarget = 1;
 		if (edgeEnabled && edgeReactive && !isPaused) {
-			const punch = getBeatPunch(posSec);
 			let norm = 0;
+			const punch = getBeatPunch(posSec);
 			if (punch !== null) {
 				norm = Math.min(punch, 1);
 			} else if (audioSegments) {
@@ -2130,8 +2650,83 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			return;
 		}
 
+		// Spicetify's own "songchange" event never fires for a Wavelink/
+		// SoundCloud track change (Spotify's Player has no idea it happened),
+		// so that's not available to re-trigger setImage() here. Cheap
+		// enough to just compare the effective URL every frame instead.
+		// Wrapped in try/catch: this whole block runs inside the same shared
+		// masterLoop as the ambience glow and edge glow — an uncaught error
+		// here would silently kill requestAnimationFrame(masterLoop) for
+		// everything, not just this feature, which is almost certainly why
+		// the reactive animation appeared to stop working entirely.
+		try {
+			if (document.body.classList.contains("sc-active")) {
+				const effectiveUrl = getEffectiveCoverUrl(Spicetify.Player.data.item.metadata);
+				if (effectiveUrl !== lastEffectiveCoverUrl) {
+					lastEffectiveCoverUrl = effectiveUrl;
+					setImage(Spicetify.Player.data.item.metadata);
+				}
+				// Panel background sync — reuses the app's own existing
+				// "ALBUM ART BACKGROUND" mechanism (.Root__top-container::before
+				// in user.css, driven by --image_url, normally updated by
+				// onSongChange()) instead of a separate element. That existing
+				// layer is already correctly positioned/blurred/layered behind
+				// everything — Wavelink track changes just never triggered its
+				// update before, since they don't fire Spicetify's songchange.
+				// Uses getWavelinkRenderedCoverUrl() directly (not
+				// getEffectiveCoverUrl()) so this stays independent of the
+				// Cover art sync toggle — turning that off shouldn't also
+				// silently break this separate feature.
+				if (document.body.classList.contains("__cleanest_compat_wavelink_bgsync")) {
+					const bgUrl = getWavelinkRenderedCoverUrl();
+					if (bgUrl) {
+						document.documentElement.style.setProperty("--image_url", `url("${bgUrl}")`);
+						wavelinkOwnsBackground = true;
+					}
+				} else if (wavelinkOwnsBackground) {
+					restoreSpotifyBackground();
+					wavelinkOwnsBackground = false;
+				}
+
+				// Accent color sync — same idea as background sync above:
+				// recolor everything that reads --spice-accent/--spice-button/
+				// --spice-button-active (liked-songs heart, buttons, edge glow,
+				// etc.) to match the actual Wavelink/SoundCloud cover instead of
+				// staying stuck on whatever Spotify track played last.
+				if (document.body.classList.contains("__cleanest_compat_wavelink_accent")) {
+					const accentUrl = getWavelinkRenderedCoverUrl();
+					if (accentUrl && accentUrl !== lastWlAccentUrl) {
+						lastWlAccentUrl = accentUrl;
+						extractDominantColor(accentUrl, setAccentColorVars);
+						wavelinkOwnsAccentColor = true;
+					}
+				} else if (wavelinkOwnsAccentColor) {
+					restoreSpotifyAccentColor();
+					wavelinkOwnsAccentColor = false;
+					lastWlAccentUrl = null;
+				}
+			} else if (wavelinkOwnsBackground) {
+				// Playback handed back to Spotify — restore the normal
+				// track-driven background instead of leaving Wavelink's last
+				// cover stuck there.
+				restoreSpotifyBackground();
+				wavelinkOwnsBackground = false;
+			}
+			if (!document.body.classList.contains("sc-active") && wavelinkOwnsAccentColor) {
+				restoreSpotifyAccentColor();
+				wavelinkOwnsAccentColor = false;
+				lastWlAccentUrl = null;
+			}
+		} catch (err) {
+			// Swallow — see comment above. Worst case this feature silently
+			// no-ops for a frame instead of taking the whole loop down.
+		}
+
 		const baseSpread = Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-spread")) || AMBIENCE_SPREAD_PX;
-		const reactiveEnabled = rootStyle.getPropertyValue("--npv-ambience-reactive-enabled").trim() !== "0";
+		// Reactive ambience is unavailable for Wavelink tracks — see the
+		// scActive comment above. Force static brightness during Wavelink
+		// playback regardless of the toggle's own setting.
+		const reactiveEnabled = rootStyle.getPropertyValue("--npv-ambience-reactive-enabled").trim() !== "0" && !scActive;
 		const staticBrightness = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-static-brightness")) || AMBIENCE_STATIC_BRIGHTNESS * 100) / 100;
 		const reactiveMin = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-min")) || AMBIENCE_REACTIVE_MIN * 100) / 100;
 		const reactiveMax = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-max")) || AMBIENCE_REACTIVE_MAX * 100) / 100;

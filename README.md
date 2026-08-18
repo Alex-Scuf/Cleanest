@@ -1,5 +1,6 @@
 <h1 align=center>Cleanest <br>
-<img width="200" height="200" alt="Без имени-d1" src="https://github.com/user-attachments/assets/bb2005bc-471c-47f7-a52d-6e8758d82581" />
+<img width="150" height="150" alt="Без имени-1" src="https://github.com/user-attachments/assets/b7a3b5aa-6a9a-4147-8e20-26cc21685d8d" />
+
 
 
 </h1>

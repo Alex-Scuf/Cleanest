@@ -1,4 +1,8 @@
- <h1 align=center>Cleanest</h1>
+<h1 align=center>Cleanest <br>
+<img width="200" height="200" alt="Без имени-d1" src="https://github.com/user-attachments/assets/bb2005bc-471c-47f7-a52d-6e8758d82581" />
+
+
+</h1>
 <P align=center>A Spicetify theme based on the <a href="https://github.com/Astromations/Hazy">"Hazy"</a> theme
   <BR>An ultra-clean theme</BR></P>
 

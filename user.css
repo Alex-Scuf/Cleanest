@@ -235,8 +235,9 @@ YOUR LIBRARY
   align-content: center;
 }
 
-/* Box shadow under "playlists, podcasts, etc" buttons */
-.bextOq_5YFeq7Im9BlTE {
+/* Box shadow under "playlists, podcasts, etc" buttons
+   Toggle: "Playlist/podcast button shadow" in Advanced Theme Settings (default off) */
+body:not(.__cleanest_show_playlistbutton_shadow) .bextOq_5YFeq7Im9BlTE {
   box-shadow: none !important;
   -webkit-box-shadow: none !important;
 }
@@ -324,8 +325,9 @@ NOW PLAYING BAR
   margin: 0;
   padding: 0;
 
-  background-color: var(--backdrop) !important;
+  background-color: var(--cleanest-bg-nowplayingbar, var(--backdrop)) !important;
   border-radius: var(--button-border);
+  backdrop-filter: none !important;
 }
 
 .main-nowPlayingBar-nowPlayingBar {
@@ -521,9 +523,10 @@ SIDEBAR
   display: none;
 }
 
-/* tentative fix for sidebar box shadow */
-.main-nowPlayingView-nowPlayingWidget > div > div:nth-child(1) > div,
-.mdMUqcSHFw1lZIcYEblu {
+/* tentative fix for sidebar box shadow
+   Toggle: "Sidebar shadow" in Advanced Theme Settings (default off) */
+body:not(.__cleanest_show_sidebar_shadow) .main-nowPlayingView-nowPlayingWidget > div > div:nth-child(1) > div,
+body:not(.__cleanest_show_sidebar_shadow) .mdMUqcSHFw1lZIcYEblu {
   box-shadow: none !important;
 }
 
@@ -556,8 +559,9 @@ SIDEBAR
   box-shadow: 0px 2px 10px 2px rgb(0 0 0 / 10%);
 }
 
-/* Hide "up next" DJ X tinted background in sidebar */
-.main-nowPlayingView-mainWrapper.TjX06ItOHm0J21btzLaj {
+/* Hide "up next" DJ X tinted background in sidebar
+   Toggle: "Up next" DJ tint background in Advanced Theme Settings (default off) */
+body:not(.__cleanest_show_dj_tint) .main-nowPlayingView-mainWrapper.TjX06ItOHm0J21btzLaj {
     background: none;
 }
 
@@ -749,7 +753,7 @@ PLAYLIST VIEW
 ------------*/
 
 .Root__main-view {
-  background-color: var(--backdrop) !important;
+  background-color: var(--cleanest-bg-mainview, var(--backdrop)) !important;
 }
 
 .main-view-container [fade="top"] {
@@ -775,8 +779,11 @@ PLAYLIST VIEW
 }
 
 .main-trackList-trackListHeader {
-  box-shadow: none !important;
   backdrop-filter: blur(8px) !important;
+}
+/* Toggle: "Track list header shadow" in Advanced Theme Settings (default off) */
+body:not(.__cleanest_show_tracklistheader_shadow) .main-trackList-trackListHeader {
+  box-shadow: none !important;
 }
 
 .main-trackList-trackListRow:focus-within,
@@ -827,7 +834,8 @@ PLAYLIST VIEW
   box-shadow: -2px 4px 9px 3px rgb(0 0 0 / 15%);
 }
 
-.main-entityHeader-shadow {
+/* Toggle: "Artist header shadow" in Advanced Theme Settings (default off) */
+body:not(.__cleanest_show_artistheader_shadow) .main-entityHeader-shadow {
   box-shadow: none;
 }
 
@@ -1021,6 +1029,9 @@ TOP BAR
 .main-trackList-trackListHeader.main-trackList-trackListHeaderStuck {
   background: none;
   position: static !important;
+}
+body:not(.__cleanest_show_tracklistheader_shadow) .nav-ylx .main-trackList-trackListHeaderStuck.main-trackList-trackListHeader,
+body:not(.__cleanest_show_tracklistheader_shadow) .main-trackList-trackListHeader.main-trackList-trackListHeaderStuck {
   box-shadow: unset;
 }
 
@@ -1120,7 +1131,7 @@ PLAY BUTTONS
 }
 
 .Root__globalNav {
-  background: none !important;
+  background-color: var(--cleanest-bg-globalnav, transparent) !important;
 }
 
 .Root__globalNav button {
@@ -1146,9 +1157,13 @@ PLAY BUTTONS
 
 .main-globalNav-buddyFeed,
 .main-topBar-buddyFeed {
-  box-shadow: none !important;
   width: 32px;
   height: 32px;
+}
+/* Toggle: "Top bar friend activity shadow" in Advanced Theme Settings (default off) */
+body:not(.__cleanest_show_topbar_friendactivity_shadow) .main-globalNav-buddyFeed,
+body:not(.__cleanest_show_topbar_friendactivity_shadow) .main-topBar-buddyFeed {
+  box-shadow: none !important;
 }
 
 .main-topBar-buddyFeed,
@@ -1544,24 +1559,27 @@ SNACKBAR NOTIFS
 TEXT SHADOWS
 ----------*/
 
-.main-entityHeader-topbarTitle,
-.main-shelf-title,
-.main-entityHeader-titleButton,
-.main-entityHeader-metaData,
-.playlist-playlist-playlistDescription,
-.main-entityHeader-detailsText,
-.main-entityHeader-title,
-.artist-artistVerifiedBadge-wrapper > span,
-.main-buddyFeed-link,
-.main-trackInfo-name,
-.main-trackInfo-contentWrapper,
-.main-trackInfo-contentWrapper,
-.main-yourLibraryX-listRowSubtitle,
-.ListRowTitle__LineClamp-sc-1xe2if1-0,
-.main-yourLibraryX-header .main-yourLibraryX-collapseButtonWrapper,
-.main-yourLibraryX-navItem > a > span,
-.playback-bar__progress-time-elapsed,
-.cvTLPmjt6T7M85EKcB8w {
+/* Toggle: "Track title text shadow" in Advanced Theme Settings.
+   Unlike the other Advanced toggles, this one defaults ON (matches what
+   was already always-applied before this toggle existed) — turning it OFF
+   removes the shadow instead of the usual "OFF reveals a hidden shadow". */
+body.__cleanest_show_tracktitle_textshadow .main-entityHeader-topbarTitle,
+body.__cleanest_show_tracktitle_textshadow .main-shelf-title,
+body.__cleanest_show_tracktitle_textshadow .main-entityHeader-titleButton,
+body.__cleanest_show_tracktitle_textshadow .main-entityHeader-metaData,
+body.__cleanest_show_tracktitle_textshadow .playlist-playlist-playlistDescription,
+body.__cleanest_show_tracktitle_textshadow .main-entityHeader-detailsText,
+body.__cleanest_show_tracktitle_textshadow .main-entityHeader-title,
+body.__cleanest_show_tracktitle_textshadow .artist-artistVerifiedBadge-wrapper > span,
+body.__cleanest_show_tracktitle_textshadow .main-buddyFeed-link,
+body.__cleanest_show_tracktitle_textshadow .main-trackInfo-name,
+body.__cleanest_show_tracktitle_textshadow .main-trackInfo-contentWrapper,
+body.__cleanest_show_tracktitle_textshadow .main-yourLibraryX-listRowSubtitle,
+body.__cleanest_show_tracktitle_textshadow .ListRowTitle__LineClamp-sc-1xe2if1-0,
+body.__cleanest_show_tracktitle_textshadow .main-yourLibraryX-header .main-yourLibraryX-collapseButtonWrapper,
+body.__cleanest_show_tracktitle_textshadow .main-yourLibraryX-navItem > a > span,
+body.__cleanest_show_tracktitle_textshadow .playback-bar__progress-time-elapsed,
+body.__cleanest_show_tracktitle_textshadow .cvTLPmjt6T7M85EKcB8w {
   text-shadow: -1px 3px 20px rgb(0 0 0 / 20%);
 }
 
@@ -1799,13 +1817,15 @@ main-card-draggable,
   border-radius: var(--button-border);
 }
 
-/* Disable square box shadow on circular artist photo */
-.GOcsybnoHYyJGQGDRuwj.MxmW8QkHqHWtuhO589PV:has(.MxmW8QkHqHWtuhO589PV) {
+/* Disable square box shadow on circular artist photo
+   Toggle: "Card shadows" in Advanced Theme Settings (default off) */
+body:not(.__cleanest_show_card_shadows) .GOcsybnoHYyJGQGDRuwj.MxmW8QkHqHWtuhO589PV:has(.MxmW8QkHqHWtuhO589PV) {
   box-shadow: none !important;
 }
 
-/* Hide background behind chips (All, Music, Podcasts, Audiobooks) */
-.main-home-filterChipsSection.CEB3nzyniIFOx1yM1eYy:after {
+/* Hide background behind chips (All, Music, Podcasts, Audiobooks)
+   Toggle: "Filter chip background" in Advanced Theme Settings (default off) */
+body:not(.__cleanest_show_chip_background) .main-home-filterChipsSection.CEB3nzyniIFOx1yM1eYy:after {
   background: none !important;
 }
 
@@ -2182,8 +2202,9 @@ SPOTIFY CINEMA FULLSCREEN
   border-radius: var(--button-border) !important;
 }
 
-/* Hide "related music videos" shelf */
-.Root__cinema-view .main-nowPlayingView-section.tB3JVNYttFlVC_oYVfjI {
+/* Hide "related music videos" shelf
+   Toggle: "Related music videos shelf" in Advanced Theme Settings (default off) */
+body:not(.__cleanest_show_related_videos) .Root__cinema-view .main-nowPlayingView-section.tB3JVNYttFlVC_oYVfjI {
   display: none;
 }
 
@@ -2805,6 +2826,16 @@ select {
   padding-right: var(--button-border);
 }
 
+/* The dropdown popup list (Preferences: notification volume, close-button
+   behavior, equalizer presets, etc.) — options were showing with a white
+   background despite already having an inline background-color style,
+   so forcing it here explicitly with !important. */
+select option,
+select optgroup {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
 /*-------------------
 THEMED PRIMARY BUTTON
 -------------------*/
@@ -3081,7 +3112,9 @@ body.__cleanest_hidenowplayingsidebar .Root__top-container:has(.Root__right-side
     box-shadow: 0px 2px 10px 2px rgb(0 0 0 / 10%);
 }
 
-body:not(.SpicyLyrics_StaticBackground) .Root__right-sidebar:has(.main-nowPlayingView-section,canvas) {
+/* Compat: Spicy Lyrics. Toggle: "Spicy Lyrics" in Advanced Theme Settings
+   > Compatibility (default on). */
+body.__cleanest_compat_spicylyrics_bgtint:not(.SpicyLyrics_StaticBackground) .Root__right-sidebar:has(.main-nowPlayingView-section,canvas) {
     --background-tint: 
 color-mix(in srgb, rgb(255 255 255 / 0%) 7%, #00000000);
     --spice-card: var(--background-tint);
@@ -3089,11 +3122,7 @@ color-mix(in srgb, rgb(255 255 255 / 0%) 7%, #00000000);
 }
 
 .main-yourLibraryX-entryPoints {
-    background-color: rgb(0 0 0 / 0%) !important;
-}
-
-.Root__top-container { 
---now-playing-bar-grid-area-z-index: hidden;
+    background-color: var(--cleanest-bg-library, rgb(0 0 0 / 0%)) !important;
 }
 
 .encore-layout-themes, .encore-dark-theme .encore-announcement-set, .encore-bright-accent-set {
@@ -3116,17 +3145,21 @@ background-color: #00000000;
     --carousel-end-chevron-gradient: #12121200;
 }
 
-.view-homeShortcutsGrid-shortcut,
-.view-homeShortcutsGrid-shortcut * {
+/* Toggle: "Home shortcut tiles shadow" in Advanced Theme Settings (default off) */
+body:not(.__cleanest_show_homeshortcuts_shadow) .view-homeShortcutsGrid-shortcut,
+body:not(.__cleanest_show_homeshortcuts_shadow) .view-homeShortcutsGrid-shortcut * {
   box-shadow: none !important;
 }
 
-.main-yourLibraryX-listRowEntityImage {
+/* Toggle: "Library row image shadow" in Advanced Theme Settings (default off).
+   This overrides the shadow-adding rule above (.main-yourLibraryX-listRowEntityImage
+   near the top of the file) — turning this toggle ON lets that rule show through. */
+body:not(.__cleanest_show_libraryrow_shadow) .main-yourLibraryX-listRowEntityImage {
   box-shadow: none !important;
 }
 
 .Root__right-sidebar aside {
-    --background-base: #0a0a0a00 !important;
+    --background-base: var(--cleanest-bg-sidebar, #0a0a0a00) !important;
 }
 
 [class="main-topBar-background gaELPQ269mY6yQwB"] {display:none!important;}
@@ -3201,7 +3234,8 @@ Specificity: (0,1,2)
 position: static;
 }
 
-#SpicyLyricsNPVCard .CardControl {
+/* Compat: Spicy Lyrics (same toggle as above) */
+body.__cleanest_compat_spicylyrics_cardshadow #SpicyLyricsNPVCard .CardControl {
     box-shadow: none;
     background: none;
 }
@@ -3226,7 +3260,8 @@ position: static;
     background-color: rgb(40 40 40 / 0%) !important;
 }
 
-.spicy-dynamic-bg {
+/* Compat: Spicy Lyrics (same toggle as above) */
+body.__cleanest_compat_spicylyrics_hidedynamicbg .spicy-dynamic-bg {
 display: none !important;
 }
 
@@ -3240,7 +3275,8 @@ display: none !important;
     border-bottom: none;
 }
 
-.BEeVmHj340c0PYHe {
+/* Toggle: "Sidebar header shadow" in Advanced Theme Settings (default off) */
+body:not(.__cleanest_show_sidebarheader_shadow) .BEeVmHj340c0PYHe {
     box-shadow: none;
 }
 
@@ -3276,7 +3312,7 @@ body.__cleanest_likedheart_recolor img[src*="liked-songs"] {
    относительно его границ, а не всей страницы */
 body.__cleanest_likedheart_recolor div:has(> img[src*="liked-songs"]) {
   position: relative !important;
-  	display: inline-block;
+  display: inline-block !important;
 }
 
 /* Шаг 3: рисуем сердце как mask-фигуру, заливая её динамическим
@@ -3307,3 +3343,33 @@ body.__cleanest_likedheart_recolor div:has(> img[src*="liked-songs"])::after {
 
 .playback-bar {position: relative !important; display: block !important; --playback-bar-grid-gap: 8px !important; -webkit-box-orient: horizontal !important; -webkit-box-direction: normal !important; -webkit-box-pack: justify !important; -webkit-box-align: center !important; align-items: center !important; display: -webkit-box !important; display: flex !important; flex-direction: row !important; gap: var(--playback-bar-grid-gap) !important; justify-content: space-between !important; height: 12px !important;} .x-progressBar-progressBarBg {--progress-bar-height: 6px !important; --progress-bar-radius: 10px !important;} :root .Root__now-playing-bar .playback-bar > div {height: 17.59px !important;} .player-controls__buttons--new-icons { margin-bottom: 12px !importan;} .main-nowPlayingBar-nowPlayingBar {padding-bottom: 0px !important;}
 
+
+
+[class="ONPKU0_LuCIj71gm"] {height: 330px !important;}
+
+/* Compat: Wavelink. Toggle: "Transparent top bar" in Advanced Theme
+   Settings > Compatibility > Wavelink (default on). */
+body.__cleanest_compat_wavelink_topbar .wl-topbar {
+  background: transparent !important;
+  border-bottom: none !important;
+}
+
+.playlist-playlist-playlistDescription {
+  color: #ffffff;
+}
+
+.C1bclLSaqIszUOtI {
+    --generic-tooltip-background-color: #4687d600;
+    background-color: #4687d600;
+}
+
+/* Compat: Wavelink — remove the default hero background/border behind
+   the account area so it doesn't clash with the theme's own panels. */
+.wl-account-hero {
+  background: none !important;
+  border: none;
+}
+
+.Dropdown-menu {
+  background-color: rgb(40 40 40 / 50%) !important;
+}

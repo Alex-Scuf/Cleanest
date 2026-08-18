@@ -2,6 +2,7 @@
 <P align=center>A Spicetify theme based on the <a href="https://github.com/Astromations/Hazy">"Hazy"</a> theme
   <BR>An ultra-clean theme</BR></P>
 
+[![Live Preview](https://img.shields.io/badge/Live%20Preview-GitHub%20Pages-blue?style=for-the-badge&logo=github)](https://github.com/Alex-Scuf/Cleanest)
 
 <h1 align=center>Preview</h1>
 

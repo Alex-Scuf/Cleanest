@@ -13,7 +13,7 @@
 <div>
 
 <details>
-<summary><h1>Previews</h1></summary>
+<summary>Previews</summary>
 <img width="1921" height="1037" alt="preview5" src="https://github.com/user-attachments/assets/422d385a-c439-42d9-b221-eae7f96a7434" />
 
 <img width="1913" height="1037" alt="preview" src="https://github.com/user-attachments/assets/da8fed12-4deb-4d28-8e55-267e7630308c" />
@@ -30,7 +30,7 @@
 
 <div>
  <details>
-<summary><h1>Key differences</h1></summary>
+<summary>Key differences</summary>
 
 <h2 align=center>1. The "Liked Songs" cover art now adapts to the changing theme color</h2>
 
@@ -115,7 +115,7 @@ Recommended tracks at the end of the playlist/album
 </div>
 <div>
 <details>
-<summary><h1>Settings & Compabilities</h1></summary>
+<summary>Settings & Compabilities</summary>
 
 <h3 align=center>Standard Settings</h3>
 I tried to make the theme as customizable as possible. If you have any suggestions regarding settings, feel free to post them in the <a href="https://discord.gg/CkzuJBFdFf">Spicetify Discord channel</a> under the "themes" tab (that's where I usually hang out).
@@ -172,7 +172,7 @@ Enable compatibility settings for certain extensions and applications that I use
 <div>
  <details>
 
-<summary><h1>How install</h1></summary>
+<summary>How install</summary>
 
 
 <h3>Automatically</h3>

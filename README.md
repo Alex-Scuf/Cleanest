@@ -1,8 +1,5 @@
 <h1 align=center>Cleanest <br>
 <img width="150" height="150" alt="Без имени-1" src="https://github.com/user-attachments/assets/b7a3b5aa-6a9a-4147-8e20-26cc21685d8d" />
-
-
-
 </h1>
 <P align=center>A Spicetify theme based on the <a href="https://github.com/Astromations/Hazy">"Hazy"</a> theme
   <BR>An ultra-clean theme</BR></P>
@@ -13,7 +10,7 @@
   </a>
 </p>
 
-<div align=center>
+<div>
 
 <details>
 <summary><h1>Previews</h1></summary>
@@ -31,7 +28,7 @@
 </details>
 </div>
 
-<div align=center>
+<div>
  <details>
 <summary><h1>Key differences</h1></summary>
 
@@ -116,7 +113,7 @@ Recommended tracks at the end of the playlist/album
 <img width="798" height="412" alt="ezgif com-crop (1)" src="https://github.com/user-attachments/assets/09f9dcf2-139a-41bd-b2f5-5e24e9b4f1ee" />
 </details>
 </div>
-<div align=center>
+<div>
 <details>
 <summary><h1>Settings & Compabilities</h1></summary>
 
@@ -172,7 +169,7 @@ Enable compatibility settings for certain extensions and applications that I use
 </details>
 </div>
 
-<div align=center>
+<div>
  <details>
 
 <summary><h1>How install</h1></summary>

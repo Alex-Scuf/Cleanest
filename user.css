@@ -3134,7 +3134,7 @@ color-mix(in srgb, rgb(255 255 255 / 0%) 7%, #00000000);
 }
 
 .encore-dark-theme, .encore-dark-theme .encore-base-set {
---background-tinted-base: rgb(0 0 0 / 32%);
+--background-tinted-base: rgb(0 0 0 / 0%);
 }
 
 .main-home-filterChipsSection.fzMaM8folMIckYG2:after {

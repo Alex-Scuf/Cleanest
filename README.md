@@ -111,6 +111,11 @@ Recommended tracks at the end of the playlist/album
 
 
 <img width="798" height="412" alt="ezgif com-crop (1)" src="https://github.com/user-attachments/assets/09f9dcf2-139a-41bd-b2f5-5e24e9b4f1ee" />
+<br>
+
+<h2 align=center>6. Animated ambience Canvas Video</h2>
+
+<img width="140" height="241" alt="ezgif com-crop (2)" src="https://github.com/user-attachments/assets/92720c54-93c9-49de-9473-9646ae93c3cb" />
 </details>
 </div>
 <div>
@@ -125,7 +130,7 @@ I tried to make the theme as customizable as possible. If you have any suggestio
 <b>Here are the standard theme settings:</b>
 <br>
  <br>
-<img width="929" height="722" alt="Снимок экрана 2026-08-15 140328" src="https://github.com/user-attachments/assets/ded85640-2250-48af-a813-d7c17a2c52ab" />
+<img width="931" height="810" alt="Снимок экрана 2026-08-24 141129" src="https://github.com/user-attachments/assets/e82268e2-5391-40c0-8da2-465b7bd245d5" />
 <br>
 <br>
 <b>Here you can:
@@ -144,6 +149,9 @@ Configure static and dynamic screen edge lighting
 <br>
 <br>
 Toggle the visibility of specific elements (About Artist, merch, Queue button, etc.)
+<br>
+<br>
+Enable/disable animated ambience on canvas video
 </b>
 
 <h3 align=center>Advanced Settings</h3>

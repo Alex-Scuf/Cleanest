@@ -134,6 +134,22 @@
       animated: true,
     },
     {
+      id: "AmbienceVideoSync",
+      name: "Canvas video ambience",
+      defVal: true,
+      group: "ambience",
+      animated: true,
+      subgroup: "canvasvideo",
+    },
+    {
+      id: "AmbienceVideoLeftOnly",
+      name: "Left side only",
+      defVal: false,
+      group: "ambience",
+      animated: true,
+      subgroup: "canvasvideo",
+    },
+    {
       id: "EdgeGlowEnabled",
       name: "Enable screen edge glow",
       defVal: true,
@@ -1048,6 +1064,10 @@
       // effect is ENABLED (default), so the user.css rules should be
       // scoped with `body.__cleanest_likedheart_recolor`, not `:not()`.
       LikedHeartRecolor: { className: "__cleanest_likedheart_recolor", defVal: true },
+      // Live-updating ambience while Canvas video is showing (see
+      // npvAmbience()'s isVideoMode handling) and its layout variant.
+      AmbienceVideoSync: { className: "__cleanest_ambience_video_sync", defVal: true },
+      AmbienceVideoLeftOnly: { className: "__cleanest_ambience_video_leftonly", defVal: false },
 
       // Generated from ADVANCED_TOGGLES/SHADOW_TOGGLES (defined further
       // down/above, same outer scope) rather than duplicated here by
@@ -1127,7 +1147,17 @@
     toggles.ExtendSidebars = storedExtendSidebars === null ? false : JSON.parse(storedExtendSidebars);
     document.body.classList.toggle("__cleanest_extend_sidebars", toggles.ExtendSidebars);
 
-    onSongChange();
+    // Skip when Wavelink currently owns playback — onSongChange() always
+    // pulls from Spotify's OWN player state (Spicetify.Player.data),
+    // which doesn't change while a Wavelink/SoundCloud track plays. Left
+    // unguarded, clicking Apply would silently overwrite whatever accent
+    // color Wavelink's own track set with the last real Spotify track's
+    // color instead — and since the Wavelink accent-sync loop only
+    // reacts to the cover URL actually changing, it wouldn't notice or
+    // correct this on its own until the next real track change.
+    if (!document.body.classList.contains("sc-active")) {
+      onSongChange();
+    }
   }
 
   // Input for custom background images (disabled until properly implemented)
@@ -1192,7 +1222,15 @@
       const toggleRow = document.createElement("div");
       toggleRow.classList.add("cleanestOptionRow");
       if (group) toggleRow.classList.add(`cleanest-group-${group}`);
-      if (group && !master) toggleRow.classList.add(`cleanest-${group}-dependent`);
+      // "AmbienceVideoLeftOnly" is deliberately excluded here — it has its
+      // own separate lock (updateCanvasVideoLock(), tied specifically to
+      // "Canvas video ambience") rather than the general group one. It
+      // used to get both: this class subjected it to updateSettingsLocks()
+      // too, which re-unlocks every ambience-group "-dependent" row
+      // whenever ANY of them fires (not just "Animated Ambience" — the
+      // master "Enable ambience glow" alone was enough), stomping on
+      // whatever updateCanvasVideoLock() had just set.
+      if (group && !master && id !== "AmbienceVideoLeftOnly") toggleRow.classList.add(`cleanest-${group}-dependent`);
       // Note: "animated" is intentionally NOT applied here for toggles —
       // only to sliders (below). If the group's own "reacts to music"
       // toggle marked itself as animated, it would need itself to already
@@ -1211,6 +1249,7 @@
         .addEventListener("click", () => {
           toggleRow.querySelector(".toggle").classList.toggle("enabled");
           if (group in GROUP_MASTERS) updateSettingsLocks();
+          if (id === "AmbienceVideoSync") updateCanvasVideoLock();
         });
       const isEnabled = JSON.parse(localStorage.getItem(id)) ?? defVal;
       toggleRow.querySelector(".toggle").classList.toggle("enabled", isEnabled);
@@ -1290,6 +1329,18 @@
           row.classList.toggle("cleanest-disabled", !shouldEnable);
         });
       }
+    }
+
+    // "Left side only" only makes sense alongside "Canvas video ambience"
+    // itself — separate from the general group-master lock above since
+    // this is a dependency on one specific sibling toggle, not the whole
+    // group's master/reactive switches.
+    function updateCanvasVideoLock() {
+      const syncOn = content
+        .querySelector('.cleanestOptionRow[name="AmbienceVideoSync"] .toggle')
+        ?.classList.contains("enabled");
+      const leftOnlyRow = content.querySelector('.cleanestOptionRow[name="AmbienceVideoLeftOnly"]');
+      leftOnlyRow?.classList.toggle("cleanest-disabled", !syncOn);
     }
 
     const srcInput = document.createElement("input");
@@ -1383,11 +1434,16 @@
 
     addSubHeader("Animated", ambienceColumn, "ambience");
     toggleInfo
-      .filter((opt) => opt.group === "ambience" && opt.animated)
+      .filter((opt) => opt.group === "ambience" && opt.animated && opt.subgroup !== "canvasvideo")
       .forEach((opt) => createToggle(opt, ambienceColumn));
     sliders
-      .filter((opt) => opt.group === "ambience" && opt.animated)
+      .filter((opt) => opt.group === "ambience" && opt.animated && opt.subgroup !== "canvasvideo")
       .forEach((opt) => createSlider(opt, ambienceColumn));
+
+    addSubHeader("Canvas video", ambienceColumn, "ambience");
+    toggleInfo
+      .filter((opt) => opt.group === "ambience" && opt.subgroup === "canvasvideo")
+      .forEach((opt) => createToggle(opt, ambienceColumn));
 
     addSectionHeader("Edge Glow", edgeGlowColumn);
     // Color comes from the theme's own dynamic accent (var(--spice-accent)
@@ -1421,6 +1477,7 @@
 
     loadSliders();
     updateSettingsLocks();
+    updateCanvasVideoLock();
 
     img = content.querySelector("img");
     img.src = localStorage.getItem("cleanest:startupBg") || defImage;
@@ -1623,7 +1680,14 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		body.__cleanest_hide_ontour [class="main-nowPlayingView-section y6MSp2Cg3wf9ZqdX"] {
 			display: none !important;
 		}
-		body.__cleanest_hide_switchtovideo [class="main-nowPlayingView-actionButtonContainer"] {
+		/* [class~="X"] (not [class="X"]) — Spotify adds an extra class
+		   ("encore-over-media-set") to this container specifically while
+		   Canvas video is playing, which made the old exact-match
+		   selector stop matching and silently do nothing only in that
+		   state (confirmed via a DevTools screenshot). ~= matches any
+		   single class in the space-separated list, so it's immune to
+		   whatever else gets added alongside it. */
+		body.__cleanest_hide_switchtovideo [class~="main-nowPlayingView-actionButtonContainer"] {
 			display: none !important;
 		}
 		/* Confirmed exact aria-labels from your DevTools screenshot:
@@ -2211,19 +2275,64 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			+ `L${x},${y + r} A${r},${r} 0 0 1 ${x + r},${y} Z`;
 	}
 
+	// The "left side only" strip's L-shape (cap along the top narrowing
+	// down into the vertical strip beside the video). Plain hard right-
+	// angle corner at the notch, on purpose — every attempt at smoothing
+	// this specific corner so far (a two-arc S-curve, a single elliptical
+	// arc, a blurred-mask union) came out wrong in a different way each
+	// time — bulging outward, reading as a tilt/lean, or breaking the
+	// mask entirely. A correct, reliable hard corner beats another
+	// incorrect soft one; this can be revisited once there's a properly
+	// verified way to soften it.
+	function leftOnlyClipPathData(topCapWidth, topCapHeight, stripWidth, wrapperHeight) {
+		return `M0,0 L${topCapWidth},0 L${topCapWidth},${topCapHeight} L${stripWidth},${topCapHeight} `
+			+ `L${stripWidth},${wrapperHeight} L0,${wrapperHeight} Z`;
+	}
+
 	// The cover art itself is rounded (border-radius), so a hard rectangular
 	// hole leaves a gap at each corner where neither the artwork nor the
 	// glow paints anything — showing raw dark background through as small
 	// black corner notches. Reading the radius straight from the actual
 	// element (rather than hardcoding a guess) keeps this matching exactly
 	// even if Spotify changes it in a future update.
-	function getCoverCornerRadius(coverEl) {
-		const candidates = [coverEl, coverEl.querySelector("img")].filter(Boolean);
+	// Checks the actual visible media element (mediaEl — video when
+	// "Switch to video"/Canvas is active, img otherwise) first, then its
+	// immediate parent (rounding is sometimes applied to a clipping
+	// wrapper around the video rather than the <video> tag itself), then
+	// falls back to the container.
+	function getCoverCornerRadius(coverEl, mediaEl) {
+		const candidates = [mediaEl, mediaEl?.parentElement, coverEl, coverEl.querySelector("img")].filter(Boolean);
 		for (const el of candidates) {
 			const r = Number.parseFloat(getComputedStyle(el).borderRadius);
 			if (r > 0) return r;
 		}
 		return 8; // sane fallback if nothing reports a radius
+	}
+
+	// The actual visible media surface inside the cover art container —
+	// a <video> when Canvas/"Switch to video" is showing a clip, an <img>
+	// otherwise. Measuring this element directly (rather than the
+	// container) keeps the glow's cutout matching what's actually on
+	// screen even if Spotify wraps the video in extra padding/letterboxing
+	// that doesn't match the container's own box.
+	//
+	// While Wavelink owns playback (sc-active), Spotify's own Canvas
+	// <video> from whatever track played last through Spotify itself can
+	// still be sitting in the DOM, just hidden rather than removed — so
+	// querySelector("video") kept finding it and treating Wavelink/
+	// SoundCloud tracks as "video mode" too, leaving canvas-video-only
+	// glow behavior (and the CORS-safe non-analysis of it) stuck on even
+	// though nothing relevant is actually playing there anymore. Wavelink
+	// never renders its own cover via <video> (only <img>, confirmed
+	// earlier via getWavelinkRenderedCoverUrl()), so skipping the video
+	// check outright whenever Wavelink is active sidesteps the stale
+	// element entirely rather than trying to detect "stale" some other
+	// way.
+	function getCoverMediaEl(coverEl) {
+		if (document.body.classList.contains("sc-active")) {
+			return coverEl.querySelector("img") || coverEl;
+		}
+		return coverEl.querySelector("video") || coverEl.querySelector("img") || coverEl;
 	}
 
 	// Wrapping the glow in its own clipping window rather than appending it
@@ -2257,6 +2366,112 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 	let beatCursor = 0;
 	let smoothedBrightness = 1;
 	let smoothedSizeMult = 1;
+
+	// --- Canvas video ambience: live-updating glow instead of a static
+	// blurred image ---
+	// First attempt cloned Spotify's <video> into a second element with
+	// the same src to play independently — but Canvas videos load from a
+	// blob: URL, and Spotify revokes that URL shortly after its own
+	// <video> finishes loading it (freeing memory once it doesn't need
+	// the blob anymore). A second element requesting the same
+	// already-revoked blob: URL fails outright (net::ERR_FILE_NOT_FOUND
+	// — confirmed via logging), so that approach is a dead end.
+	// This instead repeatedly copies the CURRENT FRAME of Spotify's own,
+	// already-playing <video> onto a small <canvas> via drawImage() —
+	// no new network/blob request at all, so the revoked-URL problem
+	// never comes up, and it's automatically always in perfect sync since
+	// it's quite literally the same element's pixels each time. Also
+	// sidesteps CORS entirely for a different reason than the blob issue:
+	// drawImage() copying a frame onto a canvas is always allowed
+	// regardless of cross-origin-ness; only reading pixels back out of
+	// that canvas afterward (getImageData/toDataURL — neither of which
+	// this does) is what CORS would restrict. Never touches Spotify's own
+	// <video> element itself — no src/currentTime/play/pause calls on it,
+	// strictly read-only via drawImage().
+	let ambienceVideoCanvas = null;
+	let ambienceVideoCtx = null;
+	let lastAmbienceFrameDraw = 0;
+	// Tracks which <video> the requestVideoFrameCallback chain (if any) is
+	// currently following — set to null to make the chain stop scheduling
+	// itself on its next tick, without needing a fragile call to
+	// cancelVideoFrameCallback with a possibly-stale handle.
+	let ambienceVideoRvfcSource = null;
+	function drawAmbienceVideoFrame(sourceVideo) {
+		if (!ambienceVideoCtx || sourceVideo.readyState < 2) return;
+		try {
+			ambienceVideoCtx.drawImage(sourceVideo, 0, 0, ambienceVideoCanvas.width, ambienceVideoCanvas.height);
+		} catch (err) {
+			// Defensive only — drawImage() itself doesn't require
+			// cross-origin permission, but bail out quietly rather than
+			// spamming errors every frame if a browser disagrees.
+		}
+	}
+	function ensureAmbienceVideoAttached(sourceVideo) {
+		if (!ambienceVideoCanvas) {
+			const canvas = document.createElement("canvas");
+			// Small on purpose — this gets heavily blurred by the layer's
+			// own CSS filter regardless, so a low-res source costs far less
+			// per-frame drawImage() work without any visible quality loss.
+			canvas.width = 64;
+			canvas.height = 64;
+			canvas.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;";
+			ambienceVideoCanvas = canvas;
+			ambienceVideoCtx = canvas.getContext("2d");
+		}
+		if (ambienceVideoCanvas.parentElement !== layers.el) {
+			layers.el.appendChild(ambienceVideoCanvas);
+		}
+		// Prefer requestVideoFrameCallback where available — it fires
+		// exactly when the browser presents a newly-decoded frame, so the
+		// ambience tracks actual playback rather than polling on a fixed
+		// timer that can double-sample the same frame or skip one. Falls
+		// back to the simple throttled-poll approach otherwise.
+		if (typeof sourceVideo.requestVideoFrameCallback === "function") {
+			if (ambienceVideoRvfcSource !== sourceVideo) {
+				ambienceVideoRvfcSource = sourceVideo;
+				const onFrame = () => {
+					// Source changed or detached since this was scheduled —
+					// let the chain die instead of scheduling another tick.
+					if (ambienceVideoRvfcSource !== sourceVideo) return;
+					drawAmbienceVideoFrame(sourceVideo);
+					sourceVideo.requestVideoFrameCallback(onFrame);
+				};
+				sourceVideo.requestVideoFrameCallback(onFrame);
+			}
+		} else {
+			const now = Date.now();
+			if (now - lastAmbienceFrameDraw > 80) {
+				lastAmbienceFrameDraw = now;
+				drawAmbienceVideoFrame(sourceVideo);
+			}
+		}
+	}
+	function detachAmbienceVideo() {
+		if (ambienceVideoCanvas && ambienceVideoCanvas.parentElement) {
+			ambienceVideoCanvas.remove();
+		}
+		ambienceVideoRvfcSource = null;
+	}
+
+	// TEMPORARY diagnostic — logs once every ~3s to check whether the
+	// canvas-video path is actually being reached and what it sees at
+	// each step, since this can't be verified without a live browser.
+	// Remove once confirmed working.
+	let _wlDebugLastVideoLog = 0;
+	function _wlDebugLogVideoAmbience(isVideoMode, mediaEl) {
+		const now = Date.now();
+		if (now - _wlDebugLastVideoLog < 3000) return;
+		_wlDebugLastVideoLog = now;
+		console.log(
+			"[Cleanest/AmbienceVideo] isVideoMode:", isVideoMode,
+			"mediaEl.tagName:", mediaEl.tagName,
+			"sync toggle class present:", document.body.classList.contains("__cleanest_ambience_video_sync"),
+			"leftOnly toggle class present:", document.body.classList.contains("__cleanest_ambience_video_leftonly"),
+			isVideoMode ? "readyState:" : "",
+			isVideoMode ? mediaEl.readyState : "",
+			"canvas attached:", !!(ambienceVideoCanvas && ambienceVideoCanvas.parentElement)
+		);
+	}
 
 	async function loadAudioAnalysis() {
 		audioSegments = null;
@@ -2646,6 +2861,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 
 		if (!cover || !masterEnabled) {
 			document.documentElement.style.setProperty("--npv-ambience-opacity", 0);
+			detachAmbienceVideo();
 			requestAnimationFrame(masterLoop);
 			return;
 		}
@@ -2768,7 +2984,32 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		// broken rather than just "slightly less smooth". Running this
 		// every frame costs more, but keeps the glow rigidly attached to
 		// the cover regardless of how fast it's moving.
-		const rect = cover.getBoundingClientRect();
+		const mediaEl = getCoverMediaEl(cover);
+		const rect = mediaEl.getBoundingClientRect();
+
+		// Canvas video ("Switch to video"/looping clip) detection — the
+		// only signal used is the tag itself, nothing structural that
+		// could vary between Spotify versions.
+		const isVideoMode = mediaEl.tagName === "VIDEO";
+		_wlDebugLogVideoAmbience(isVideoMode, mediaEl);
+		const videoSyncOn = document.body.classList.contains("__cleanest_ambience_video_sync");
+		if (isVideoMode && videoSyncOn) {
+			ensureAmbienceVideoAttached(mediaEl);
+		} else {
+			detachAmbienceVideo();
+		}
+		// With the toggle off, there's no live frame to show and no
+		// legitimate cover-art image either (Canvas videos don't have a
+		// static image counterpart) — the layer would otherwise keep
+		// showing whatever static blurred image was last set (from
+		// before the video started), which doesn't match what's on
+		// screen. Hiding the glow outright while a video plays without
+		// sync enabled avoids ever showing stale/mismatched content next
+		// to — or, if the hole-cutout geometry is ever a frame behind on
+		// a fast resize, briefly over — the video.
+		const hideAmbienceForVideo = isVideoMode && !videoSyncOn;
+		const leftOnly = isVideoMode && document.body.classList.contains("__cleanest_ambience_video_leftonly");
+
 		// The sidebar's own overlayscrollbars viewport exposes a `fade`
 		// attribute (bottom / full / top) that already tracks exactly
 		// whether it's scrolled — "bottom" means resting at the very top
@@ -2779,7 +3020,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		// visibility/clipping heuristics.
 		const viewportEl = document.querySelector(".Root__right-sidebar [data-overlayscrollbars-viewport]");
 		const fade = viewportEl ? viewportEl.getAttribute("fade") : null;
-		const key = `${rect.top}|${rect.left}|${rect.width}|${rect.height}|${spread.toFixed(1)}|${fade}`;
+		const key = `${rect.top}|${rect.left}|${rect.width}|${rect.height}|${spread.toFixed(1)}|${fade}|${leftOnly}`;
 		if (key !== lastRectKey) {
 			lastRectKey = key;
 			const outerW = rect.width + spread * 2;
@@ -2811,8 +3052,14 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			// It's handled by the wrapper's plain overflow:hidden instead
 			// now — see below — so this path only ever does the cover cutout.)
 			const pad = Math.max(spread * 4, 200);
-			const cornerRadius = getCoverCornerRadius(cover);
+			const cornerRadius = getCoverCornerRadius(cover, mediaEl);
 			const outerPath = `M${-pad},${-pad} L${outerW + pad},${-pad} L${outerW + pad},${outerH + pad} L${-pad},${outerH + pad} Z`;
+			// REVERTED — the shrunk/"fed" hole didn't actually read as a
+			// smooth fade (blur softens color, not the cutout's own hard
+			// alpha edge — shifting where that edge sits doesn't change
+			// that it's still a hard edge). Back to a plain hole matching
+			// the cover's rect exactly until there's a properly-working
+			// soft-fade technique to try instead.
 			const innerPath = roundedRectPathData(spread, spread, rect.width, rect.height, cornerRadius);
 			const clipPath = `path(evenodd, "${outerPath} ${innerPath}")`;
 
@@ -2823,21 +3070,155 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			// content is scrolled.
 			const FAR = 100000;
 			let wrapperTop = -FAR;
+			const header = document.querySelector(".Root__right-sidebar .main-nowPlayingView-headerContainer");
 			if (fade === "full" || fade === "top") {
-				const header = document.querySelector(".Root__right-sidebar .main-nowPlayingView-headerContainer");
 				if (header) {
 					wrapperTop = header.getBoundingClientRect().bottom;
 				}
 			}
-			const wrapperLeft = -FAR;
-			const wrapperWidth = FAR * 2;
-			const wrapperHeight = FAR * 2;
+			// The above only kicked in once the sidebar had actually been
+			// scrolled — at rest (fade === "bottom", the normal state right
+			// after opening Now Playing) wrapperTop stayed at -FAR, so
+			// nothing stopped the ring's blur from bleeding all the way up
+			// past the header, past the playlist title, right up to the
+			// window's own title bar. Clamping unconditionally (regardless
+			// of scroll state) crops that off directly. Uses the header's
+			// own top edge, not the sidebar element's — the sidebar's outer
+			// box turned out to extend a bit higher than where its visible
+			// content (the header/title) actually starts, so clamping to
+			// the sidebar itself still let a sliver bleed through.
+			if (header) {
+				wrapperTop = Math.max(wrapperTop, header.getBoundingClientRect().top);
+			}
+			let wrapperBottom = FAR; // unbounded downward by default
+			// Extra padding above/below the video for the "left only"
+			// strip, and — reused below — how tall the top cap of the
+			// L-shape is.
+			const leftOnlyVPad = Math.max(spread * 2, 60);
+			// Even with the crop boundary landing exactly on the video's
+			// own edge, a thin sliver of color still showed right at that
+			// line — not a geometry bug, just an inherent side effect of
+			// blurring right up to a hard clip: blur smears nearby bright
+			// pixels outward, and clipping cuts the canvas but can't un-
+			// blur what's already bled toward the edge. Pulling the crop
+			// boundary inward by roughly the blur radius means that smear
+			// happens within the already-hidden region instead of right at
+			// the visible edge.
+			const blurPx = Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-blur")) || AMBIENCE_BLUR_PX;
+			if (leftOnly) {
+				// Without this, the wrapper's height stayed FAR*2 (basically
+				// the whole viewport) even after the width got cropped to
+				// the left sliver — so the visible strip stretched from the
+				// very top of the screen to the very bottom instead of just
+				// sitting alongside the video. Cap top/bottom to roughly the
+				// video's own vertical span so the strip only runs alongside
+				// it.
+				wrapperTop = Math.max(wrapperTop, rect.top - leftOnlyVPad);
+				wrapperBottom = Math.min(wrapperBottom, rect.top + rect.height - blurPx / 2);
+			} else if (isVideoMode) {
+				// Regular ring mode, but still Canvas video. Bottom: flush
+				// with the video's own bottom edge, no extra padding — the
+				// ring used to bleed glow below the video indefinitely
+				// (wrapperBottom left at FAR, effectively unbounded), which
+				// wasn't wanted there. Top: also tightened to roughly the
+				// ring's own natural extent (`pad`, the same blur-bleed
+				// margin the ring's own outerPath already uses) instead of
+				// staying way up near the header — without this, the top
+				// fade (a fixed 40px measured from wrapperTop) ended up
+				// happening in empty space up near the header/title, nowhere
+				// near where the ring actually becomes visible around the
+				// video, so it didn't look like it was doing anything.
+				// Static covers (the plain `else` case, not video) get
+				// neither of these — that ring stays full and symmetric
+				// like it always has; both of these crops were only ever
+				// meant for video.
+				wrapperTop = Math.max(wrapperTop, rect.top - pad);
+				wrapperBottom = Math.min(wrapperBottom, rect.top + rect.height - blurPx / 2);
+			}
+			const wrapperHeight = wrapperBottom - wrapperTop;
+			// Normally the wrapper sits enormously far off to the left
+			// (-FAR) and is FAR*2 wide — effectively unbounded, since the
+			// ring's own clip-path already does the real shaping and
+			// nothing needs cropping. "Left side only" instead sizes the
+			// wrapper to a normal, sane rectangle (screen x: 0 to roughly
+			// the cover's left edge) instead of that huge FAR-based span —
+			// needed so the L-shape polygon below can use plain, readable
+			// pixel coordinates relative to the wrapper's own box, rather
+			// than having to offset everything by FAR.
+			const wrapperLeft = leftOnly ? 0 : -FAR;
+			// REVERTED — see the ring's clipPath comment above; same
+			// ineffective feather idea, same revert.
+			const stripWidth = Math.max(rect.left, 0);
+			// The L's top cap: a horizontal bar that extends further right
+			// than the plain vertical strip, sitting in the padding gap
+			// directly above the video (the same leftOnlyVPad space the
+			// strip already overshoots into) — this is the "additional
+			// glow along the top edge" that was asked for, turning the
+			// strip's top from a flat cutoff into an actual corner piece
+			// that visually wraps around the video instead of just
+			// stopping. Reaches about a third of the way across the video
+			// itself, capped so it never runs past the video's own right
+			// edge.
+			const topCapHeight = leftOnlyVPad;
+			const topCapWidth = leftOnly
+				? Math.min(stripWidth + Math.max(rect.width * 0.35, 80), rect.left + rect.width)
+				: stripWidth;
+			const wrapperWidth = leftOnly ? Math.max(topCapWidth - wrapperLeft, 0) : FAR * 2;
+			// Plain overflow: hidden only crops to a rectangle — an L shape
+			// needs clip-path instead. Traces across the top to topCapWidth,
+			// down to topCapHeight, back in to stripWidth (narrowing to the
+			// vertical strip, with a smoothed S-curve at that narrowing —
+			// see leftOnlyClipPathData above), down to the bottom, then
+			// across and back up the left edge to close. Coordinates are
+			// relative to the wrapper's own box, which is why
+			// wrapperLeft/wrapperTop got switched to sane values above
+			// instead of staying FAR-offset.
+			const leftOnlyClip = leftOnly
+				? `path("${leftOnlyClipPathData(topCapWidth, topCapHeight, stripWidth, wrapperHeight)}")`
+				: "none";
+			// The hard top clamp added just now (wrapperTop pinned to the
+			// header's own edge) cuts the glow off instantly right at that
+			// line — same idea as Spotify's own video mask-image (confirmed
+			// working in this build via DevTools: a plain CSS
+			// linear-gradient, no SVG involved) that fades the video's own
+			// top/bottom edges instead of a hard cut. Doing the same thing
+			// here — a simple gradient mask on the wrapper — turns that
+			// instant cutoff into a soft appear instead, so it matches how
+			// the video itself already fades in at the same edge. Pixel-
+			// based stops (not %) since the non-leftOnly wrapper's own
+			// height is enormous (FAR-based) — a percentage of that would
+			// be imperceptibly thin.
+			const TOP_FADE_PX = 40;
+			// Bottom fade failed several different ways as a SINGLE
+			// gradient (extra stops tacked onto the same gradient, a
+			// blurred SVG mask, a separate overlay element) — but the
+			// simple top fade (a plain 2-stop gradient, on its own) always
+			// worked fine. Rather than trying to cram both fades into one
+			// gradient again, this layers TWO separate copies of that same
+			// proven 2-stop shape — one fading in from the top, one fading
+			// in from the bottom — and combines them with mask-composite:
+			// intersect, which keeps only the pixels both layers agree are
+			// visible. Near either edge, whichever gradient is more
+			// transparent there wins; in the middle, both report fully
+			// opaque, so nothing changes there.
+			const wrapperMask = `linear-gradient(to bottom, transparent 0px, black ${TOP_FADE_PX}px), `
+				+ `linear-gradient(to top, transparent 0px, black ${TOP_FADE_PX}px)`;
 
 			for (const layer of allLayers) {
 				layer.wrapper.style.top = `${wrapperTop}px`;
 				layer.wrapper.style.left = `${wrapperLeft}px`;
 				layer.wrapper.style.width = `${wrapperWidth}px`;
 				layer.wrapper.style.height = `${wrapperHeight}px`;
+				layer.wrapper.style.maskImage = wrapperMask;
+				layer.wrapper.style.webkitMaskImage = wrapperMask;
+				layer.wrapper.style.maskSize = "100% 100%";
+				layer.wrapper.style.webkitMaskSize = "100% 100%";
+				layer.wrapper.style.maskRepeat = "no-repeat";
+				layer.wrapper.style.webkitMaskRepeat = "no-repeat";
+				layer.wrapper.style.maskComposite = "intersect";
+				layer.wrapper.style.webkitMaskComposite = "source-in";
+				layer.wrapper.style.clipPath = leftOnlyClip;
+				layer.wrapper.style.webkitClipPath = leftOnlyClip;
 				// el's position is relative to the wrapper now (position:
 				// absolute inside a position:fixed wrapper), so it has to be
 				// expressed as an offset from the wrapper's own top-left,
@@ -2851,7 +3232,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 				layer.el.style.clipPath = clipPath;
 			}
 		}
-		document.documentElement.style.setProperty("--npv-ambience-opacity", rect.width > 0 ? 1 : 0);
+		document.documentElement.style.setProperty("--npv-ambience-opacity", rect.width > 0 && !hideAmbienceForVideo ? 1 : 0);
 
 		requestAnimationFrame(masterLoop);
 	}

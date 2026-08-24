@@ -376,7 +376,7 @@ NOW PLAYING BAR
 .main-repeatButton-button.main-repeatButton-active,
 .main-shuffleButton-button.main-shuffleButton-active,
 .main-genericButton-button {
-  transition: all 0.2s cubic-bezier(0, 0, 0.2, 1);
+  transition: filter 0.2s cubic-bezier(0, 0, 0.2, 1), color 0.2s cubic-bezier(0, 0, 0.2, 1);
 }
 
 .main-repeatButton-button.main-repeatButton-active:not([disabled]):hover,
@@ -711,7 +711,7 @@ WHAT'S NEW
 
 .main-buddyFeed-overlay {
   border-radius: var(--button-border) !important;
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, background-color 0.3s ease;
 }
 
 /* Spotify profile avatar */
@@ -883,7 +883,7 @@ body:not(.__cleanest_show_artistheader_shadow) .main-entityHeader-shadow {
 .profile-editImage-imageContainer,
 .main-editImageButton-overlay,
 .main-entityHeader-imageContainerClickable {
-  transition: all 0.2s cubic-bezier(0, 0, 0.2, 1);
+  transition: opacity 0.2s cubic-bezier(0, 0, 0.2, 1);
 }
 
 .main-editImageButton-overlay {
@@ -911,7 +911,7 @@ body:not(.__cleanest_show_artistheader_shadow) .main-entityHeader-shadow {
 .Button-large-large-buttonTertiary-iconOnly-condensed-useBrowserDefaultFocusStyle,
 .dMIqbdzkrLhKTMkTrFvJ {
   scale: 0.9;
-  transition: all 0.2s ease;
+  transition: scale 0.2s ease, background-color 0.2s ease;
 }
 
 .PkOz5g82CaoKk1J3GX0e {
@@ -1087,7 +1087,7 @@ PLAY BUTTONS
   background: transparent !important;
   border-radius: var(--button-border);
 
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, opacity 0.2s ease, background-color 0.2s ease;
   transform: scale(1.1) !important;
 }
 .main-yourLibraryX-listItem .main-playButton-PlayButton > button > span {
@@ -1273,7 +1273,7 @@ div.main-globalNav-searchInputSection:has(
 .sHDdcNIw9AQLbLrpdcqO {
   top: 20px;
   margin-right: 12px;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease;
   border-radius: var(--button-border) !important;
 }
 
@@ -1284,7 +1284,7 @@ div.main-globalNav-searchInputSection:has(
 .sHDdcNIw9AQLbLrpdcqO {
   border-radius: var(--button-border) !important;
   background-color: var(--backdrop);
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
 }
 
 .sHDdcNIw9AQLbLrpdcqO:focus,
@@ -1622,7 +1622,7 @@ ALBUM VIEW
   color: var(--spice-text);
   background: none;
   scale: 1.2;
-  transition: all 0.2s ease;
+  transition: scale 0.2s ease, color 0.2s ease;
 }
 
 .main-playButton-PlayButton > button > span:hover {
@@ -1753,14 +1753,38 @@ main-card-draggable,
 
 .hZjAwWMA54TvbGYwReET .main-card-imageContainer,
 .XkDqS8M3CEkouTbj8y5H .main-card-imageContainer {
-  transition: all 0.35s ease;
+  /* Was "transition: all" — on a hover effect applied to every card in
+     the whole grid, that made the browser track every single animatable
+     property (background, filter, width, height, everything) on each
+     one instead of just the two that actually change. Scoped down to
+     just transform + opacity.
+     Tried adding "will-change: transform" here too, on the theory it'd
+     pre-warm the compositing layer before the first hover — but
+     will-change on a rule that applies to EVERY card unconditionally
+     (not just :hover) makes the browser allocate a separate persistent
+     GPU-backed layer for every single card on the page at once, not
+     just the one actually being interacted with. That's the classic
+     will-change misuse and is almost certainly why memory climbed hard
+     while sweeping the mouse across a full row of cards (confirmed via
+     Task Manager). Removed — the scoped transition above is still a
+     real win on its own without it. */
+  transition: transform 0.35s ease, opacity 0.35s ease;
   transform-origin: 50% -40px;
   overflow: hidden;
 }
 
 .hZjAwWMA54TvbGYwReET:hover .main-card-imageContainer,
 .XkDqS8M3CEkouTbj8y5H:hover .main-card-imageContainer {
-  transform: perspective(76em) rotateX(14deg) translateY(-1px);
+  /* Was perspective(76em) rotateX(14deg) translateY(-1px) — a 3D tilt.
+     3D transforms (anything with perspective/rotateX/rotateY) are far
+     more expensive to composite than a flat 2D one: the GPU has to
+     rasterize the layer into an actual 3D-transformable texture instead
+     of just repositioning/rescaling a flat one, and that texture memory
+     is what was staying elevated after rapidly sweeping across a row of
+     cards even once CPU/listeners/layout counts had already dropped
+     back to normal. Plain translateY + scale gets a similar "lift
+     toward you" feel at a fraction of the GPU cost. */
+  transform: translateY(-4px) scale(1.03);
   opacity: 0.8;
 }
 
@@ -2308,7 +2332,7 @@ EXPERIMENTAL FEATURES
   text-transform: uppercase;
   letter-spacing: 2.5px;
   border: none !important;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
   background-color: #ea5d5d !important;
 }
 
@@ -2366,7 +2390,7 @@ a[href="/marketplace"] {
   border-radius: 6px !important;
   color: var(--spice-text);
   padding: 6px 36px 8px 16px;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
   font-size: 0.875rem;
   font-weight: 700;
   display: flex;
@@ -2706,7 +2730,7 @@ span.toggle.enabled {
   text-transform: uppercase;
   letter-spacing: 2.5px;
   border: none;
-  transition: all 0.3s ease 0s;
+  transition: background-color 0.3s ease 0s, box-shadow 0.3s ease 0s;
   cursor: pointer;
   background-color: #ea5d5d;
 }
@@ -2788,7 +2812,7 @@ span.toggle.enabled {
   color: rgb(255 255 255 / 60%);
   font-size: 0.8rem;
   margin-top: 0px;
-  transition: all 0.3s ease !important;
+  transition: box-shadow 0.3s ease !important;
 }
 
 .slider-value > div[contenteditable="true"]:hover,
@@ -3375,5 +3399,5 @@ body.__cleanest_compat_wavelink_topbar .wl-topbar {
 }
 
 .HFowbNOgNPgtZSE4 {
-	box-shadow: 0 6px 10px #00000000;
+  box-shadow: 0 6px 10px #00000000;
 }

@@ -32,8 +32,24 @@
   --spice-card: rgba(var(--spice-rgb-card), 0.6) !important;
 }
 
+/* Was a global `svg { filter: drop-shadow(...) }` — applied to literally
+   every SVG on the page (every icon: play buttons, hearts, nav icons,
+   menu icons, all of it). drop-shadow() is meaningfully more expensive
+   than box-shadow since it's computed from the actual rendered alpha
+   shape rather than a plain rectangle, and a huge number of Spotify's
+   icons are SVGs that animate/reveal on hover (play button overlays on
+   cards, for instance) — so this one broad rule meant almost any hover
+   interaction anywhere in the app was recomputing an expensive filter.
+   Removed as the primary suspect for "moving the mouse around lags the
+   whole app," found via reasoning through the stylesheet after a
+   narrower fix (an unscoped :has() selector) barely moved the needle on
+   its own. If the subtle shadow-on-icons look is wanted back, it should
+   be scoped to a few specific, rarely-interactive icons rather than
+   every svg on the page.
+   overflow: visible kept on its own — unrelated to the shadow, likely
+   there so icons whose viewBox extends past their nominal box don't get
+   clipped, and it costs nothing performance-wise. */
 svg {
-  filter: drop-shadow(-2px 2px 2px rgb(0 0 0 / 15%));
   overflow: visible;
 }
 
@@ -113,8 +129,6 @@ ALBUM ART BACKGROUND
     brightness(var(--bright));
   pointer-events: none;
   backface-visibility: hidden;
-  will-change: transform;
-  transition: background-image var(--transition);
   opacity: 0.55;
   z-index: 0;
 }
@@ -3333,15 +3347,23 @@ body.__cleanest_likedheart_recolor img[src*="liked-songs"] {
 
 /* Шаг 2: контейнер, который физически оборачивает img, должен иметь
    position: relative, чтобы наш ::after с inset: 0 позиционировался
-   относительно его границ, а не всей страницы */
-body.__cleanest_likedheart_recolor div:has(> img[src*="liked-songs"]) {
+   относительно его границ, а не всей страницы.
+   Раньше здесь был `div:has(> img[src*="liked-songs"])` — "div" совсем
+   без сужения означает, что браузер обязан был проверять КАЖДЫЙ div на
+   странице при пересчёте стилей. На главной странице Spotify (тысячи
+   вложенных div) это ощутимо нагружало CPU при любом hover рядом.
+   Теперь тот же div находится один раз в JS (простой querySelectorAll,
+   без :has()) и помечается обычным классом — сравнение по классу для
+   браузера практически бесплатно. См. applyLikedHeartRecolorClass() в
+   theme.js. */
+body.__cleanest_likedheart_recolor .__cleanest_liked_heart_parent {
   position: relative !important;
   display: inline-block !important;
 }
 
 /* Шаг 3: рисуем сердце как mask-фигуру, заливая её динамическим
    акцентным цветом текущего трека через var(--spice-accent) */
-body.__cleanest_likedheart_recolor div:has(> img[src*="liked-songs"])::after {
+body.__cleanest_likedheart_recolor .__cleanest_liked_heart_parent::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -3369,7 +3391,6 @@ body.__cleanest_likedheart_recolor div:has(> img[src*="liked-songs"])::after {
 
 
 
-[class="ONPKU0_LuCIj71gm"] {height: 330px !important;}
 
 /* Compat: Wavelink. Toggle: "Transparent top bar" in Advanced Theme
    Settings > Compatibility > Wavelink (default on). */

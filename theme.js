@@ -840,9 +840,6 @@
       ) {
         const zoomFactor = newOuterWidth / newInnerWidth || 1;
         document.documentElement.style.setProperty("--zoom", zoomFactor);
-        console.debug(
-          `[Cleanest] Zoom Updated: ${newOuterWidth} / ${newInnerWidth} = ${zoomFactor}`
-        );
 
         // Update previous values
         prevOuterWidth = newOuterWidth;
@@ -857,12 +854,26 @@
 
   updateZoomVariable();
 
-  function waitForElement(elements, func, timeout = 100) {
+  // shouldContinue: optional predicate checked before every attempt (both
+  // the first and every retry). Lets a caller cancel an in-flight polling
+  // chain — needed for updateLyricsPageProperties() below, which used to
+  // start a fresh independent chain (up to 100 retries × 300ms = 30s of
+  // polling) on EVERY navigation via Spicetify.Platform.History.listen,
+  // with no way to stop an earlier chain once a newer navigation
+  // superseded it. Navigate around normally for a bit (to a playlist and
+  // back to Home, say) and these stack up — multiple overlapping 300ms-
+  // interval polling loops all still checking document.querySelector()
+  // for an element that will never exist outside the lyrics view. That's
+  // a very plausible source of the "processing duration over a second"
+  // Interaction found via DevTools' Performance panel, right after
+  // navigating between pages.
+  function waitForElement(elements, func, timeout = 100, shouldContinue = () => true) {
+    if (!shouldContinue()) return;
     const queries = elements.map((element) => document.querySelector(element));
     if (queries.every((a) => a)) {
       func(queries);
     } else if (timeout > 0) {
-      setTimeout(waitForElement, 300, elements, func, timeout - 1);
+      setTimeout(waitForElement, 300, elements, func, timeout - 1, shouldContinue);
     }
   }
 
@@ -879,6 +890,33 @@
   );
 
   Spicetify.Platform.History.listen(updateLyricsPageProperties);
+
+  // Marks the wrapping <div> around any "liked songs" heart icon with a
+  // plain class, instead of matching it live via CSS `div:has(> img[src*=
+  // "liked-songs"])`. That selector's `div` was completely unqualified —
+  // matches ANY div anywhere on the page — so the browser had to check
+  // every single div's children against it on every style recalculation,
+  // which is exactly the kind of broad, unscoped :has() Chrome's own
+  // performance guidance warns about. Confirmed as a major contributor to
+  // "moving the mouse over the home page tiles maxes out CPU" via a
+  // DevTools Performance Monitor recording — high Style recalcs/sec right
+  // where "Liked Songs" (one of the very first home/library tiles) sits.
+  // A plain class selector is essentially free to match by comparison, so
+  // this trades a live, continuously-expensive CSS selector for a cheap,
+  // infrequent (1/sec) JS scan instead — same visual result, none of the
+  // per-recalc cost.
+  function applyLikedHeartRecolorClass() {
+    if (!document.body.classList.contains("__cleanest_likedheart_recolor")) return;
+    document.querySelectorAll('img[src*="liked-songs"]').forEach((img) => {
+      const parent = img.parentElement;
+      if (parent && !parent.classList.contains("__cleanest_liked_heart_parent")) {
+        parent.classList.add("__cleanest_liked_heart_parent");
+      }
+    });
+  }
+  applyLikedHeartRecolorClass();
+  setInterval(applyLikedHeartRecolorClass, 1000);
+  Spicetify.Platform.History.listen(applyLikedHeartRecolorClass);
 
   waitForElement([".Root__lyrics-cinema"], ([lyricsCinema]) => {
     const lyricsCinemaObserver = new MutationObserver(
@@ -900,7 +938,18 @@
 
   // Fixes container shifting & active line clipping
   // Taken from Bloom | https://github.com/nimsandu/spicetify-bloom
+  //
+  // generation: bumped on every call (i.e. every navigation, since this
+  // runs from Spicetify.Platform.History.listen below) so that an OLDER
+  // call's still-polling waitForElement() chains recognize they've been
+  // superseded and stop themselves instead of continuing to poll
+  // pointlessly in the background — see waitForElement's own comment for
+  // why this matters.
+  let lyricsPagePropsGeneration = 0;
   function updateLyricsPageProperties() {
+    const myGeneration = ++lyricsPagePropsGeneration;
+    const stillCurrent = () => myGeneration === lyricsPagePropsGeneration;
+
     function setLyricsPageProperties() {
       function calculateLyricsMaxWidth(lyricsContentWrapper) {
         const lyricsContentContainer = lyricsContentWrapper.parentElement;
@@ -941,7 +990,9 @@
             lyricsContentWrapper.getBoundingClientRect().width;
           lyricsContentWrapper.style.maxWidth = `${lyricsWrapperWidth}px`;
           lyricsContentWrapper.style.width = `${lyricsWrapperWidth}px`;
-        }
+        },
+        100,
+        stillCurrent
       );
     }
 
@@ -961,7 +1012,9 @@
         lyricsObserver.observe(lyricsContentProvider.parentElement, {
           childList: true,
         });
-      }
+      },
+      100,
+      stillCurrent
     );
   }
 
@@ -1158,6 +1211,11 @@
     if (!document.body.classList.contains("sc-active")) {
       onSongChange();
     }
+    // Tells the ambience module (a separate closure) that settings may
+    // have changed, so it can refresh its own cached copy — see the big
+    // comment next to settingsDirty in that module for why this replaced
+    // a time-based getComputedStyle() poll.
+    document.dispatchEvent(new CustomEvent("cleanest-settings-changed"));
   }
 
   // Input for custom background images (disabled until properly implemented)
@@ -1648,7 +1706,6 @@ const AMBIENCE_REACTIVE_SIZE_MAX = 2.5;   // size multiplier at loudness peaks (
 const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, lower = smoother
 
 // Append Styling To Head
-console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 
 (function initStyle() {
 	const style = document.createElement("style");
@@ -2453,26 +2510,6 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		ambienceVideoRvfcSource = null;
 	}
 
-	// TEMPORARY diagnostic — logs once every ~3s to check whether the
-	// canvas-video path is actually being reached and what it sees at
-	// each step, since this can't be verified without a live browser.
-	// Remove once confirmed working.
-	let _wlDebugLastVideoLog = 0;
-	function _wlDebugLogVideoAmbience(isVideoMode, mediaEl) {
-		const now = Date.now();
-		if (now - _wlDebugLastVideoLog < 3000) return;
-		_wlDebugLastVideoLog = now;
-		console.log(
-			"[Cleanest/AmbienceVideo] isVideoMode:", isVideoMode,
-			"mediaEl.tagName:", mediaEl.tagName,
-			"sync toggle class present:", document.body.classList.contains("__cleanest_ambience_video_sync"),
-			"leftOnly toggle class present:", document.body.classList.contains("__cleanest_ambience_video_leftonly"),
-			isVideoMode ? "readyState:" : "",
-			isVideoMode ? mediaEl.readyState : "",
-			"canvas attached:", !!(ambienceVideoCanvas && ambienceVideoCanvas.parentElement)
-		);
-	}
-
 	async function loadAudioAnalysis() {
 		audioSegments = null;
 		segmentCursor = 0;
@@ -2678,14 +2715,13 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		document.documentElement.style.setProperty("--spice-button-active", hex);
 		document.documentElement.style.setProperty("--spice-accent", hex);
 	}
-	// Throttled diagnostic — SoundCloud's image CDN generally does send
-	// CORS headers (unlike the audio CDN, which is what broke playback
-	// earlier), but if a particular image doesn't, drawing it to canvas
-	// taints the canvas and getImageData() throws. That's caught below and
-	// just skipped — leaves whatever accent color was already set rather
-	// than crashing anything, since this whole path only ever reads a
-	// plain <img>'s pixels and never touches audio.
-	let _accentErrLastLog = 0;
+	// SoundCloud's image CDN generally does send CORS headers (unlike the
+	// audio CDN, which is what broke playback earlier), but if a
+	// particular image doesn't, drawing it to canvas taints the canvas
+	// and getImageData() throws. That's caught below and just skipped —
+	// leaves whatever accent color was already set rather than crashing
+	// anything, since this whole path only ever reads a plain <img>'s
+	// pixels and never touches audio.
 	function extractDominantColor(url, callback) {
 		if (!url) return;
 		const img = new Image();
@@ -2705,11 +2741,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 				const hex = findDominantColor(rgbList) || findDominantColor(rgbList, true);
 				if (hex) callback(hex);
 			} catch (err) {
-				const now = Date.now();
-				if (now - _accentErrLastLog > 5000) {
-					_accentErrLastLog = now;
-					console.log("[Cleanest/Wavelink] accent color extraction failed (likely CORS-tainted image):", err);
-				}
+				// Silently skip — see the comment above this function.
 			}
 		};
 		img.src = url;
@@ -2803,8 +2835,62 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 	// browser to recalculate style more than once per frame ("layout
 	// thrashing"). One shared read + one shared write pass per frame fixes
 	// that regardless of how many effects are active at once.
+	//
+	// getComputedStyle() itself is no longer polled on a timer at all —
+	// it used to call getComputedStyle() AND re-parse every one of its
+	// ~10 settings fresh every single frame (60/sec) forever, application-
+	// wide, even on Home/Search with Now Playing closed. A 250ms poll cut
+	// the frequency down but didn't remove the underlying risk: calling
+	// getComputedStyle() forces the browser to synchronously flush ANY
+	// pending style/layout work for the WHOLE page before it can return a
+	// value — not just recompute the couple of custom properties this
+	// actually needs. On a busy page (hovering cards, lazy-loaded images,
+	// Spotify's own React re-renders), that flush can take a while, and
+	// if it happens to land in the same main-thread turn as a click, the
+	// click gets stuck behind it — confirmed via DevTools' Performance
+	// panel: a 297ms "Input delay" on an ordinary click, measured on the
+	// home page, right when this used to poll periodically regardless of
+	// whether anything had actually changed.
+	// These settings only change when the user actually edits them in the
+	// settings modal and clicks Apply — so instead of polling, this now
+	// only re-reads when that modal dispatches "cleanest-settings-
+	// changed" (see loadToggles() in the other closure), plus once up
+	// front. No periodic getComputedStyle() calls competing with random
+	// user interactions during ordinary browsing at all anymore.
+	let cachedSettings = null;
+	let settingsDirty = true;
+	document.addEventListener("cleanest-settings-changed", () => {
+		settingsDirty = true;
+	});
+	function readSettings(rootStyle) {
+		return {
+			edgeEnabled: rootStyle.getPropertyValue("--npv-edge-glow-enabled").trim() !== "0",
+			edgeReactiveEnabled: rootStyle.getPropertyValue("--npv-edge-glow-reactive-enabled").trim() !== "0",
+			edgeBoost: (Number.parseFloat(rootStyle.getPropertyValue("--npv-edge-glow-reactive-boost")) || 200) / 100,
+			masterEnabled: rootStyle.getPropertyValue("--npv-ambience-master-enabled").trim() !== "0",
+			baseSpread: Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-spread")) || AMBIENCE_SPREAD_PX,
+			reactiveEnabledRaw: rootStyle.getPropertyValue("--npv-ambience-reactive-enabled").trim() !== "0",
+			staticBrightness: (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-static-brightness")) || AMBIENCE_STATIC_BRIGHTNESS * 100) / 100,
+			reactiveMin: (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-min")) || AMBIENCE_REACTIVE_MIN * 100) / 100,
+			reactiveMax: (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-max")) || AMBIENCE_REACTIVE_MAX * 100) / 100,
+			reactiveSizeMax: (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-size-max")) || AMBIENCE_REACTIVE_SIZE_MAX * 100) / 100,
+			reactiveSmoothing: Math.min(Math.max((Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-smoothing")) || AMBIENCE_REACTIVE_SMOOTHING * 100) / 100, 0.01), 1),
+			blurPx: Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-blur")) || AMBIENCE_BLUR_PX,
+		};
+	}
 	function masterLoop() {
-		const rootStyle = getComputedStyle(document.documentElement);
+		// Do zero work while the window/tab isn't visible — still
+		// reschedules itself (so it picks back up instantly once visible
+		// again) but skips every read/write until then.
+		if (document.hidden) {
+			requestAnimationFrame(masterLoop);
+			return;
+		}
+		if (settingsDirty) {
+			cachedSettings = readSettings(getComputedStyle(document.documentElement));
+			settingsDirty = false;
+		}
+		const settings = cachedSettings;
 		// Spicetify.Player.data.isPaused reflects Spotify's OWN player —
 		// Spotify has no idea Wavelink is playing a SoundCloud track, so
 		// that flag stays true the whole time and silently gates off all
@@ -2827,8 +2913,8 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		const scActive = document.body.classList.contains("sc-active");
 
 		// --- Edge glow: cheap, always runs regardless of NPV state ---
-		const edgeEnabled = rootStyle.getPropertyValue("--npv-edge-glow-enabled").trim() !== "0";
-		const edgeReactive = rootStyle.getPropertyValue("--npv-edge-glow-reactive-enabled").trim() !== "0" && !scActive;
+		const edgeEnabled = settings.edgeEnabled;
+		const edgeReactive = settings.edgeReactiveEnabled && !scActive;
 		let edgeTarget = 1;
 		if (edgeEnabled && edgeReactive && !isPaused) {
 			let norm = 0;
@@ -2841,7 +2927,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 					norm = Math.min(Math.max((db - loudnessFloor) / (loudnessCeil - loudnessFloor), 0), 1);
 				}
 			}
-			const boost = (Number.parseFloat(rootStyle.getPropertyValue("--npv-edge-glow-reactive-boost")) || 200) / 100;
+			const boost = settings.edgeBoost;
 			edgeTarget = 1 + norm * (boost - 1);
 		}
 		// On pause, position genuinely stops advancing, so target values
@@ -2857,11 +2943,38 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 
 		// --- Cover art ambience glow: only while NPV's cover art exists ---
 		const cover = document.querySelector(".main-nowPlayingView-coverArtContainer");
-		const masterEnabled = rootStyle.getPropertyValue("--npv-ambience-master-enabled").trim() !== "0";
+		const masterEnabled = settings.masterEnabled;
 
 		if (!cover || !masterEnabled) {
 			document.documentElement.style.setProperty("--npv-ambience-opacity", 0);
 			detachAmbienceVideo();
+			// opacity: 0 alone wasn't enough — DevTools flagged this exact
+			// element (.npv-ambience-glow-layer--tint) as the page's LCP
+			// element, at 3.55s, on the HOME PAGE, where Now Playing is
+			// completely irrelevant. It's a large, heavily blurred/
+			// filtered element (filter: blur + saturate + contrast +
+			// brightness) — an invisible-but-still-huge-and-filtered
+			// element apparently still costs real paint/composite work
+			// even at opacity 0, especially while it keeps sitting at
+			// whatever sizeable geometry Now Playing last gave it.
+			// Collapsing each layer's own box to nothing (not just fading
+			// it out) removes any reason for the browser to keep treating
+			// it as significant content while it's not relevant, on top
+			// of the opacity fade already in place for when it IS.
+			for (const layer of allLayers) {
+				layer.wrapper.style.width = "0px";
+				layer.wrapper.style.height = "0px";
+				layer.el.style.width = "0px";
+				layer.el.style.height = "0px";
+			}
+			// Forces the geometry block below to re-run in full next time
+			// a cover does exist, even if it happens to land on the exact
+			// same rect/spread/etc. as before — otherwise the key-based
+			// cache (which only reacts to genuine changes) would think
+			// nothing changed and skip re-applying real dimensions,
+			// leaving the layers permanently stuck at the 0px just set
+			// above.
+			lastRectKey = "";
 			requestAnimationFrame(masterLoop);
 			return;
 		}
@@ -2938,16 +3051,16 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			// no-ops for a frame instead of taking the whole loop down.
 		}
 
-		const baseSpread = Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-spread")) || AMBIENCE_SPREAD_PX;
+		const baseSpread = settings.baseSpread;
 		// Reactive ambience is unavailable for Wavelink tracks — see the
 		// scActive comment above. Force static brightness during Wavelink
 		// playback regardless of the toggle's own setting.
-		const reactiveEnabled = rootStyle.getPropertyValue("--npv-ambience-reactive-enabled").trim() !== "0" && !scActive;
-		const staticBrightness = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-static-brightness")) || AMBIENCE_STATIC_BRIGHTNESS * 100) / 100;
-		const reactiveMin = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-min")) || AMBIENCE_REACTIVE_MIN * 100) / 100;
-		const reactiveMax = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-max")) || AMBIENCE_REACTIVE_MAX * 100) / 100;
-		const reactiveSizeMax = (Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-size-max")) || AMBIENCE_REACTIVE_SIZE_MAX * 100) / 100;
-		const reactiveSmoothing = Math.min(Math.max((Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-reactive-smoothing")) || AMBIENCE_REACTIVE_SMOOTHING * 100) / 100, 0.01), 1);
+		const reactiveEnabled = settings.reactiveEnabledRaw && !scActive;
+		const staticBrightness = settings.staticBrightness;
+		const reactiveMin = settings.reactiveMin;
+		const reactiveMax = settings.reactiveMax;
+		const reactiveSizeMax = settings.reactiveSizeMax;
+		const reactiveSmoothing = settings.reactiveSmoothing;
 		const sizeSmoothing = Math.max(reactiveSmoothing * 0.6, 0.03);
 
 		let punchNorm = 0;
@@ -2991,7 +3104,6 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 		// only signal used is the tag itself, nothing structural that
 		// could vary between Spotify versions.
 		const isVideoMode = mediaEl.tagName === "VIDEO";
-		_wlDebugLogVideoAmbience(isVideoMode, mediaEl);
 		const videoSyncOn = document.body.classList.contains("__cleanest_ambience_video_sync");
 		if (isVideoMode && videoSyncOn) {
 			ensureAmbienceVideoAttached(mediaEl);
@@ -3104,7 +3216,7 @@ console.log("[Cleanest ambience] script version: canvas-baked-blur-v1");
 			// boundary inward by roughly the blur radius means that smear
 			// happens within the already-hidden region instead of right at
 			// the visible edge.
-			const blurPx = Number.parseFloat(rootStyle.getPropertyValue("--npv-ambience-blur")) || AMBIENCE_BLUR_PX;
+			const blurPx = settings.blurPx;
 			if (leftOnly) {
 				// Without this, the wrapper's height stayed FAR*2 (basically
 				// the whole viewport) even after the width got cropped to

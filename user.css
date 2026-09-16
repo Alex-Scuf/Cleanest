@@ -3362,6 +3362,32 @@ body.__cleanest_compat_spicylyrics_hidedynamicbg .spicy-dynamic-bg {
 display: none !important;
 }
 
+/* .spicy-dynamic-bg (above) is a <canvas> that's the ONLY thing painting a
+   background behind #SpicyLyricsPage — there's nothing else underneath it,
+   so hiding it just exposes flat black. In the normal (sidebar-embedded)
+   view that's fine, since .Root__top-container::before — the app's own
+   blurred-cover background, a few rules up — still shows through behind
+   it. In Fullscreen mode, #SpicyLyricsPage covers that entirely, so this
+   gives Fullscreen its own copy of that exact same background instead:
+   same --image_url/--blur/--cont/--satu/--bright variables, same look,
+   so it's the theme's background standing in for Spicy Lyrics' own,
+   rather than nothing. */
+body.__cleanest_compat_spicylyrics_hidedynamicbg #SpicyLyricsPage.Fullscreen::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--image_url);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center;
+  transition: background-image var(--fade-time) ease !important;
+  filter: blur(var(--blur)) contrast(var(--cont)) saturate(var(--satu))
+    brightness(var(--bright));
+  opacity: 0.55;
+}
+
 .Root__right-sidebar aside .main-nowPlayingView-headerContainer {
     position: relative;
 }

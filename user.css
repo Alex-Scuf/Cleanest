@@ -932,9 +932,50 @@ body:not(.__cleanest_show_artistheader_shadow) .main-entityHeader-shadow {
   display: none;
 }
 
-.main-entityHeader-container.JYKKZFIXuf9lIHVeszuS
+/* Hides the dynamic background-color wash behind playlist/album headers
+   (derived from the cover art's dominant color). Used to be additionally
+   scoped to a specific hashed class on the parent
+   (.main-entityHeader-container.JYKKZFIXuf9lIHVeszuS) — that hash
+   changed in a Spotify update and silently broke this rule. .main-
+   entityHeader-backgroundColor itself is a stable, semantic class name,
+   so dropping the hash entirely is both simpler and more durable against
+   future updates changing that hash again. */
 .main-entityHeader-backgroundColor {
   display: none;
+}
+
+/* The wash is actually built from up to three separate layers, confirmed
+   via DevTools on the current build — and it's the SAME construction
+   (inline background-color for the extracted accent colour + a sibling/
+   self class painting background-image: linear-gradient(...) plus
+   var(--background-noise), a grain texture) reused in more than one
+   place. Using background-color: transparent (or opacity: 0) only kills
+   the colour half — the noise texture is a second, separate background
+   layer and stays behind as a faint whitish film. background: none wipes
+   every layer in one go, which is what was actually asked for here.
+
+   Layer 1 — direct child of .main-entityHeader-container carrying the
+   inline colour (no class-based gradient of its own). */
+.main-entityHeader-container > div[style*="background-color"],
+/* Layer 2 — its immediate sibling: same wrapper, no inline style, gets
+   its gradient+noise purely from a hashed CSS class. Matched
+   structurally via adjacency instead of that hash, since the hash is
+   exactly what broke last time. */
+.main-entityHeader-container > div[style*="background-color"] + div,
+/* Layer 3 — on current Spotify this is the one actually doing the
+   visible work on playlist/album/artist pages: a div OUTSIDE
+   .main-entityHeader-container entirely (a sibling of it, not a
+   descendant), so the two rules above never touched it. Carries both
+   the inline colour AND its own background-image (gradient+noise) via
+   a hashed class — matched here by its position right after the header
+   container instead of that hash. */
+.main-entityHeader-container + div[style*="background-color"],
+/* Same layer-3 pattern, reused at the top of the Home page. There it's
+   not next to .main-entityHeader-container (Home has no entity header),
+   so it's matched instead by what's always immediately after it:
+   [data-testid="home-ads-container"]. */
+div[style*="background-color"]:has(+ [data-testid="home-ads-container"]) {
+  background: none !important;
 }
 
 .Button-large-large-buttonTertiary-iconOnly-condensed-useBrowserDefaultFocusStyle:hover {
@@ -1020,7 +1061,7 @@ TOP BAR
 
 .main-topBar-background {
   background: none;
-  backdrop-filter: blur(25px) !important;
+  backdrop-filter: none !important;
 }
 
 .main-topBar-overlay {
@@ -1100,6 +1141,7 @@ PLAY BUTTONS
   color: var(--spice-text) !important;
   background: transparent !important;
   border-radius: var(--button-border);
+  box-shadow: none !important;
 
   transition: transform 0.2s ease, opacity 0.2s ease, background-color 0.2s ease;
   transform: scale(1.1) !important;
@@ -1142,6 +1184,13 @@ PLAY BUTTONS
 
 .global_nav .main-actionButtons {
   padding-inline: 8px 0;
+}
+
+/* New element from a recent Spotify update — a plain white rectangle
+   ("spacer") in the top action-buttons row with no theme styling applied
+   to it yet. */
+.main-actionButtons-spacer {
+  background: none !important;
 }
 
 .Root__globalNav {
@@ -2678,8 +2727,18 @@ span.toggle.enabled {
   margin-left: 20px;
 }
 
-#src-input {
+#src-input,
+#src-input:focus,
+#src-input:hover {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  font-size: 14px;
   margin-bottom: 5px;
+  border: none;
+  outline: none;
 }
 
 .main-editImageButton-icon svg {
@@ -3307,14 +3366,18 @@ display: none !important;
     position: relative;
 }
 
-.Root__right-sidebar aside .main-nowPlayingView-headerContainer.BEeVmHj340c0PYHe {
+/* Hash updated: was .BEeVmHj340c0PYHe, confirmed via DevTools to now be
+   ._WXoQxsGVuSUBWYEu1bY. This is what silently broke the box-shadow
+   toggle right below — the selector just stopped matching anything, so
+   Spotify's native shadow showed through with nothing opposing it. */
+.Root__right-sidebar aside .main-nowPlayingView-headerContainer._WXoQxsGVuSUBWYEu1bY {
     background-color: rgb(10 10 10 / 0%) !important;
     backdrop-filter: none;
     border-bottom: none;
 }
 
 /* Toggle: "Sidebar header shadow" in Advanced Theme Settings (default off) */
-body:not(.__cleanest_show_sidebarheader_shadow) .BEeVmHj340c0PYHe {
+body:not(.__cleanest_show_sidebarheader_shadow) ._WXoQxsGVuSUBWYEu1bY {
     box-shadow: none;
 }
 

@@ -1725,27 +1725,75 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 		body.__cleanest_hide_listeningactivity [aria-label="Listening activity"] {
 			display: none !important;
 		}
-		body.__cleanest_hide_credits [class="main-nowPlayingView-section main-nowPlayingView-credits"] {
+		/* About Artist, Credits, On Tour and Merch all live as sibling
+		   .main-nowPlayingView-section blocks inside the now-playing
+		   sidebar, in that fixed order — confirmed this round by hovering
+		   the actual rendered Merch block in DevTools and reading its
+		   tooltip (div.main-nowPlayingView-section.hGskSJM3bQ9pufiDFfv7),
+		   which lines up with it being the 3rd section after About Artist,
+		   not the 2nd. The previous fix guessed 2nd (no On Tour section
+		   existed in the earlier screenshots to reveal the gap), which is
+		   why it was hiding On Tour instead of Merch.
+		   CORRECTION: On Tour turns out NOT to always render its slot —
+		   for artists with no tour dates it's missing from the DOM
+		   entirely (not just empty), confirmed by this shifting Merch and
+		   Queue up by one position and causing the Merch rule below to
+		   catch the real Queue section and hide it. Since there's no way
+		   to tell from CSS alone whether a given track has an On Tour
+		   section, positions can still be off by one for Credits/On Tour/
+		   Merch specifically (a cosmetic mismatch among those three) —
+		   but every one of them is now guarded with :not(:last-of-type)
+		   so none of them can ever reach into Queue's slot regardless,
+		   which is the one that actually matters.
+		   About Artist itself carries a stable semantic class
+		   (.main-nowPlayingView-aboutArtist) — it used to be a bare hash,
+		   a7gn1W5xEIEyxWUU, which is what the old rule matched; that hash
+		   is gone. Credits/On Tour/Merch have no semantic hook of their
+		   own any more, so they're matched by position off of that one
+		   stable anchor instead. */
+		body.__cleanest_hide_aboutartist .main-nowPlayingView-aboutArtist {
 			display: none !important;
 		}
-		body.__cleanest_hide_merch [class="main-nowPlayingView-section UF4iFZpYucsei5By"] {
+		body.__cleanest_hide_credits .main-nowPlayingView-aboutArtist + .main-nowPlayingView-section:not(:last-of-type) {
 			display: none !important;
 		}
-		body.__cleanest_hide_aboutartist [class="a7gn1W5xEIEyxWUU"] {
+		body.__cleanest_hide_ontour .main-nowPlayingView-aboutArtist + .main-nowPlayingView-section + .main-nowPlayingView-section:not(:last-of-type) {
 			display: none !important;
 		}
-		body.__cleanest_hide_ontour [class="main-nowPlayingView-section y6MSp2Cg3wf9ZqdX"] {
+		body.__cleanest_hide_merch .main-nowPlayingView-aboutArtist + .main-nowPlayingView-section + .main-nowPlayingView-section + .main-nowPlayingView-section:not(:last-of-type) {
 			display: none !important;
 		}
-		/* [class~="X"] (not [class="X"]) — Spotify adds an extra class
-		   ("encore-over-media-set") to this container specifically while
-		   Canvas video is playing, which made the old exact-match
-		   selector stop matching and silently do nothing only in that
-		   state (confirmed via a DevTools screenshot). ~= matches any
-		   single class in the space-separated list, so it's immune to
-		   whatever else gets added alongside it. */
-		body.__cleanest_hide_switchtovideo [class~="main-nowPlayingView-actionButtonContainer"] {
+		/* The old .main-nowPlayingView-actionButtonContainer class this used
+		   to target doesn't exist anywhere in the DOM any more (confirmed
+		   via DevTools) — Spotify rebuilt this control with fully hashed
+		   classes and no semantic hook. aria-label="Switch to video" on the
+		   button itself is still stable, so :has() targets its immediate
+		   wrapper (the grid cell reserving its layout space) structurally
+		   instead, regardless of whatever hash that wrapper has now. */
+		body.__cleanest_hide_switchtovideo div:has(> button[aria-label="Switch to video"]) {
 			display: none !important;
+		}
+		/* "Next in queue" — pulls it up to sit right under the cover art
+		   instead of at the bottom, after Credits/On Tour/Merch/etc.
+		   Spotify's own native stylesheet already has a rule for this
+		   exact purpose: .main-nowPlayingView-section:not(.main-
+		   nowPlayingView-queue) { order: 99 }, i.e. every section EXCEPT
+		   the one carrying a semantic .main-nowPlayingView-queue class
+		   gets pushed down. Confirmed via DevTools that the real queue
+		   section no longer carries that class at all (just a bare hash,
+		   currently LguNLyc0Zj3IIy5bxmgs) — so it falls into the order:99
+		   bucket along with everything else and just sinks to wherever
+		   plain DOM order puts it (last), instead of staying exempt.
+		   It's reliably the LAST .main-nowPlayingView-section sibling
+		   (has its own --section-gap inline style, for spacing between
+		   queued tracks), so :last-of-type identifies it without needing
+		   its hash at all — this one should survive hash changes on its
+		   own. order: 1 sits it after the cover art / lyrics card (which
+		   default to order: 0) but ahead of the order: 99 group. If it
+		   lands somewhere other than "right under the cover", that
+		   number is the one to adjust. */
+		.main-nowPlayingView-panel .main-nowPlayingView-section:last-of-type {
+			order: 1 !important;
 		}
 		/* Confirmed exact aria-labels from your DevTools screenshot:
 		   "Open Miniplayer" / "Enter Full screen" (likely toggle to
@@ -1899,7 +1947,29 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 		/* Widen the settings modal itself and lay Theme / Ambience Glow / Edge
 		   Glow / Elements out side by side instead of one long vertical list.
 		   Scoped to this specific modal via its aria-label so nothing else in
-		   the app is affected. */
+		   the app is affected.
+		   A Spotify update wrapped the modal component these ride on in an
+		   extra outer layer — .generic-modal > .GenericModal__overlay >
+		   .GenericModal[aria-label="..."] — that didn't exist before. The
+		   original inner structure (.main-trackCreditsModal-container/
+		   -mainSection/-header/-closeBtn) is still there completely
+		   unchanged (confirmed via DevTools), so those rules below are
+		   untouched. The NEW outer .GenericModal wrapper apparently comes
+		   with its own default positioning that was pushing the whole
+		   modal down below the now-playing bar — centering it explicitly
+		   here fixes that regardless of whatever that native default
+		   actually was. */
+		.GenericModal[aria-label="Cleanest Settings"],
+		.GenericModal[aria-label="Advanced Theme Settings"] {
+			position: fixed !important;
+			top: 50% !important;
+			left: 50% !important;
+			bottom: auto !important;
+			right: auto !important;
+			transform: translate(-50%, -50%) !important;
+			margin: 0 !important;
+			max-height: 85vh !important;
+		}
 		div[aria-label="Cleanest Settings"] .main-trackCreditsModal-container {
 			width: fit-content !important;
 			min-width: 720px !important;
@@ -2175,9 +2245,54 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 		   (attached straight to <body>, need to stay above the app's own
 		   panels). Spotify's own dialogs default to z-index:100, which loses
 		   to both. Dialogs should always win over decorative effects, so
-		   this is pushed above the higher of the two (edge glow, 999999). */
+		   this is pushed above the higher of the two (edge glow, 999999).
+
+		   <generic-modal> is a genuine custom element TAG wrapping all of
+		   this, not a class — confirmed via DevTools: <generic-modal><div
+		   class="GenericModal__overlay" style="z-index: 100;">...</div>
+		   </generic-modal>. An earlier attempt at this fix used
+		   .generic-modal (a class selector), which could never match a bare
+		   element with no such class attribute — nothing was actually being
+		   targeted, hence no visible change. display: contents takes it out
+		   of the box model entirely (generates no box, establishes no
+		   stacking context of its own), so it can't end up trapping or
+		   clipping its child's stacking the way an unstyled custom element
+		   (default display: inline) potentially could. */
+		generic-modal {
+			display: contents;
+		}
+
+		/* .GenericModal__overlay is the actual backdrop — meant to dim the
+		   app and catch clicks outside the dialog to close it. DevTools
+		   confirms it carries an INLINE z-index: 100, which loses to the
+		   ambience/edge glow's z-index: 999999 — that's the direct cause of
+		   both symptoms: the dim tint painting underneath those layers (so
+		   it reads as "missing"), and clicks landing on whatever's visually
+		   on top instead of being caught by the backdrop. A stylesheet rule
+		   with !important still beats a plain (non-!important) inline
+		   style, so this wins despite the inline value. Position/
+		   background/pointer-events are made explicit rather than trusted
+		   to Spotify's own default, since relying on that default is
+		   exactly what broke silently last time. */
 		.GenericModal__overlay {
+			position: fixed !important;
+			inset: 0 !important;
 			z-index: 1000000 !important;
+			background-color: var(--backdrop-dark) !important;
+			pointer-events: auto !important;
+			/* <generic-modal> going display:contents (above) almost certainly
+			   stripped away flex-centering it was providing natively — our
+			   own two modals never showed it because they carry their own
+			   explicit position/transform override (search this file for
+			   aria-label="Cleanest Settings"), but a stock dialog like
+			   Spicetify's "reload required" popup has no such override and
+			   fell back to plain top-left block flow instead of centering.
+			   Centering here instead fixes every GenericModal dialog
+			   generically, ours included, rather than requiring an
+			   aria-label-specific override for each one. */
+			display: flex !important;
+			align-items: center !important;
+			justify-content: center !important;
 		}
 
 		/* One blurred/tinted element for the whole frame, with a clip-path
@@ -2195,7 +2310,9 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 			transition: background-color 0.25s, backdrop-filter 0.5s, opacity 0.4s ease-out;
 		}
 
-		.Root__right-sidebar aside .main-nowPlayingView-headerContainer.BEeVmHj340c0PYHe {
+		/* Hash updated: was .BEeVmHj340c0PYHe, confirmed via DevTools to now
+		   be ._WXoQxsGVuSUBWYEu1bY. */
+		.Root__right-sidebar aside .main-nowPlayingView-headerContainer._WXoQxsGVuSUBWYEu1bY {
 			height: 63px;
 			background-color: rgba(var(--spice-rgb-main), 0.2) !important;
 			backdrop-filter: blur(24px) saturate(140%) brightness(0.6);

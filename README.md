@@ -10,6 +10,8 @@
   </a>
 </p>
 
+<div align=center>
+  <b>⚠️ ATTENTION! The cover art and screen-glow animations are temporarily disabled. The reason: "getAudioData" has stopped providing track information—which is exactly what powered the animation. I am currently testing other animation methods, but so far, without success ⚠️</b></div>
 <div>
 
 <details>

@@ -954,14 +954,21 @@ body:not(.__cleanest_show_artistheader_shadow) .main-entityHeader-shadow {
    layer and stays behind as a faint whitish film. background: none wipes
    every layer in one go, which is what was actually asked for here.
 
-   Layer 1 — direct child of .main-entityHeader-container carrying the
-   inline colour (no class-based gradient of its own). */
-.main-entityHeader-container > div[style*="background-color"],
+   Layer 1 — inside .main-entityHeader-container, carrying the inline
+   colour (no class-based gradient of its own). On playlist/album pages
+   it's a direct child; on artist pages it sits one level deeper, inside
+   an extra wrapper div Spotify adds there — matched as a descendant
+   (not just a direct child) to cover both without caring which. */
+.main-entityHeader-container div[style*="background-color"] {
+  background: none !important;
+}
 /* Layer 2 — its immediate sibling: same wrapper, no inline style, gets
    its gradient+noise purely from a hashed CSS class. Matched
    structurally via adjacency instead of that hash, since the hash is
    exactly what broke last time. */
-.main-entityHeader-container > div[style*="background-color"] + div,
+.main-entityHeader-container div[style*="background-color"] + div {
+  background: none !important;
+}
 /* Layer 3 — on current Spotify this is the one actually doing the
    visible work on playlist/album/artist pages: a div OUTSIDE
    .main-entityHeader-container entirely (a sibling of it, not a
@@ -969,13 +976,36 @@ body:not(.__cleanest_show_artistheader_shadow) .main-entityHeader-shadow {
    the inline colour AND its own background-image (gradient+noise) via
    a hashed class — matched here by its position right after the header
    container instead of that hash. */
-.main-entityHeader-container + div[style*="background-color"],
+.main-entityHeader-container + div[style*="background-color"] {
+  background: none !important;
+}
 /* Same layer-3 pattern, reused at the top of the Home page. There it's
    not next to .main-entityHeader-container (Home has no entity header),
    so it's matched instead by what's always immediately after it:
-   [data-testid="home-ads-container"]. */
+   [data-testid="home-ads-container"]. Kept as its own separate rule
+   (not comma-joined with Layers 1-3 above) deliberately: a plain,
+   non-forgiving selector list is invalidated IN FULL if even one
+   selector in it fails to parse, and this is the one relying on :has(),
+   the newest/least certain piece of syntax here — splitting means a
+   problem with this one can't ever take the other three down with it. */
 div[style*="background-color"]:has(+ [data-testid="home-ads-container"]) {
   background: none !important;
+}
+
+/* Direct backstop: the pattern-matching Layers above kept not taking
+   effect for reasons I couldn't pin down for certain (possibly the
+   :has() rule invalidating the group in an earlier version of this file;
+   possibly something else) — this targets the exact class confirmed via
+   DevTools across several different pages this session (Liked Songs,
+   ALEKSEEV, MACAN), no selector cleverness involved, just display: none
+   on the specific class itself. It's position: absolute (per its own
+   native rule), so hiding it doesn't leave a gap — nothing else in the
+   header was relying on it for layout, only for the background wash.
+   Will need updating to whatever the new hash is if/when Spotify changes
+   it again; the Layers above stay in place too, in case they end up
+   covering some other page/state this exact hash doesn't. */
+.M7ECcaA17LC8UqL2GKVD {
+  display: none !important;
 }
 
 .Button-large-large-buttonTertiary-iconOnly-condensed-useBrowserDefaultFocusStyle:hover {

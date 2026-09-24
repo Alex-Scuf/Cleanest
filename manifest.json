@@ -5,7 +5,7 @@
   "readme": "README.md",
   "usercss": "user.css",
   "schemes": "color.ini",
-  "include": ["https://alex-scuf.github.io/Cleanest/theme.js"],
+  "include": ["https://alex-scuf.github.io/Cleanest/theme.js"; "https://alex-scuf.github.io/Cleanest/cleanest_audio_bridge.py"],
   "authors": [
     {
       "name": "Alex-Scuf",

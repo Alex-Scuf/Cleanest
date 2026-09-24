@@ -11,7 +11,19 @@
 </p>
 
 <div align=center>
-  <b>⚠️ ATTENTION! The cover art and screen-glow animations are temporarily disabled. The reason: "getAudioData" has stopped providing track information—which is exactly what powered the animation. I am currently testing other animation methods, but so far, without success ⚠️</b></div>
+  <b>⚠️ Good news: I’ve found a working method to get the animated lighting running. IMPORTANT NOTE: This requires a separate Python script which, unfortunately, currently only works on Windows. Follow the steps below to get it working:
+    <br>
+    <br>
+1. Download the "cleanest_audio_bridge.py" file and save it to a location of your choice.
+    <br>
+2. Open PowerShell and run the command: `pip install PyAudioWPatch websockets numpy`.
+     <br>
+3. Launch Spotify, go to the theme settings tab, select "Advanced theme settings," and toggle on "Use local audio bridge when unavailable"
+    <br>
+4. In PowerShell, enter `cd Path_to_script` and then run `python cleanest_audio_bridge.py`.
+<br>
+    <br>
+That’s it. There is one downside to this method: it captures audio from all windows, not just the Spotify window. For now, however, this is the only working solution to the problem. ⚠️</b></div>
 <div>
 
 <details>

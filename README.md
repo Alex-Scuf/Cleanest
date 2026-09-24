@@ -20,7 +20,7 @@
      <br>
 3. Launch Spotify, go to the theme settings tab, select "Advanced theme settings," and toggle on "Use local audio bridge when unavailable"
     <br>
-4. In PowerShell, enter `cd Path_to_script` and then run `python cleanest_audio_bridge.py`.
+4. Run `python cleanest_audio_bridge.py`.
 <br>
     <br>
 That’s it. There is one downside to this method: it captures audio from all windows, not just the Spotify window. For now, however, this is the only working solution to the problem. ⚠️</b></div>

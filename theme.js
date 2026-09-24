@@ -261,6 +261,17 @@
     { id: "WavelinkAccentSync", name: "Accent color sync", className: "__cleanest_compat_wavelink_accent", defVal: true, category: "compat", mod: "Wavelink" },
     { id: "WavelinkBackgroundSync", name: "Panel background sync", className: "__cleanest_compat_wavelink_bgsync", defVal: true, category: "compat", mod: "Wavelink" },
     { id: "WavelinkTopbarTransparent", name: "Transparent top bar", className: "__cleanest_compat_wavelink_topbar", defVal: true, category: "compat", mod: "Wavelink" },
+
+    // Reactive fallbacks for Animated Ambience/Animated edge glow — both
+    // off by default, so the plain toggles in Cleanest Settings keep
+    // behaving exactly like they always did (real Spotify beat/loudness
+    // data, or flat if unavailable) unless explicitly opted into here.
+    // See the big comment above getBpmPulse()/connectAudioBridge()
+    // in the ambience glow module for how each actually works and their
+    // real constraints.
+    { id: "ReactiveFallbackBpm", name: "Pulse to track tempo when detailed audio data is unavailable", className: "__cleanest_reactive_fallback_bpm", defVal: false, category: "reactive" },
+    { id: "ReactiveFallbackBridge", name: "Use local audio bridge when unavailable (Windows, requires separate app)", className: "__cleanest_reactive_fallback_bridge", defVal: false, category: "reactive" },
+    { id: "ReactiveBridgeBassOnly", name: "Bridge: react to raw bass level instead of beat flashes", className: "__cleanest_reactive_bridge_bassonly", defVal: false, category: "reactive" },
   ];
 
   // Panel background color/opacity customization. Each panel's CSS rule
@@ -293,6 +304,12 @@
     PANEL_BACKGROUNDS.forEach(applyPanelBackground);
   }
   applyAllPanelBackgrounds();
+
+  // Persists across separate openAdvancedThemeModal() calls so each one can
+  // remove the previous call's "cleanest-bridge-status" listener before adding
+  // its own — otherwise reopening this modal repeatedly during a session
+  // would stack up duplicate listeners.
+  let bridgeStatusListenerRef = null;
 
   function openAdvancedThemeModal() {
     const content = document.createElement("div");
@@ -353,6 +370,7 @@
 
     const CATEGORY_HEADERS = {
       compat: "Compatibility",
+      reactive: "Reactive fallback (experimental)",
     };
 
     let currentCategory = null;
@@ -391,9 +409,31 @@
         row.querySelector(".toggle").classList.toggle("enabled", nowEnabled);
         localStorage.setItem(id, JSON.stringify(nowEnabled));
         document.body.classList.toggle(className, nowEnabled);
+        document.dispatchEvent(new CustomEvent("cleanest-settings-changed"));
       });
       content.append(row);
     }
+
+    // System audio capture needs a genuine click to call getDisplayMedia()
+    // The bridge connects/disconnects automatically in step with the
+    // toggle above (see syncAudioBridgeConnection in the ambience glow
+    // module) — no button needed here, since a plain WebSocket connection,
+    // unlike getDisplayMedia, doesn't require a user gesture. This just
+    // surfaces its live status. Removing any previous listener before
+    // adding a new one keeps re-opening this modal from stacking up
+    // duplicate listeners over a session.
+    if (bridgeStatusListenerRef) document.removeEventListener("cleanest-bridge-status", bridgeStatusListenerRef);
+    const bridgeRow = document.createElement("div");
+    bridgeRow.classList.add("cleanestOptionRow");
+    const bridgeDesc = document.createElement("span");
+    bridgeDesc.classList.add("cleanestOptionDesc");
+    bridgeDesc.textContent = `Local audio bridge: ${document.body.dataset.cleanestBridgeStatus || "not started."} (run cleanest_audio_bridge.py, then enable the toggle above)`;
+    bridgeStatusListenerRef = (e) => {
+      bridgeDesc.textContent = `Local audio bridge: ${e.detail.text} (run cleanest_audio_bridge.py, then enable the toggle above)`;
+    };
+    document.addEventListener("cleanest-bridge-status", bridgeStatusListenerRef);
+    bridgeRow.append(bridgeDesc);
+    content.append(bridgeRow);
 
     const resetRow = document.createElement("div");
     resetRow.classList.add("cleanestAdvancedResetRow");
@@ -1734,7 +1774,7 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 		   not the 2nd. The previous fix guessed 2nd (no On Tour section
 		   existed in the earlier screenshots to reveal the gap), which is
 		   why it was hiding On Tour instead of Merch.
-		   CORRECTION: On Tour turns out NOT to always render its slot —
+		   CORRECTION 1: On Tour turns out NOT to always render its slot —
 		   for artists with no tour dates it's missing from the DOM
 		   entirely (not just empty), confirmed by this shifting Merch and
 		   Queue up by one position and causing the Merch rule below to
@@ -1745,21 +1785,36 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 		   but every one of them is now guarded with :not(:last-of-type)
 		   so none of them can ever reach into Queue's slot regardless,
 		   which is the one that actually matters.
+		   CORRECTION 2: About Artist — the anchor all three of these
+		   count from — turns out to ALSO be conditionally absent (not
+		   hidden, genuinely missing from the DOM) for artists with no
+		   About Artist tab at all, confirmed via DevTools. With no anchor
+		   to count from, every position-based rule below matched nothing,
+		   so Credits stayed fully visible regardless of its hide toggle —
+		   the actual bug report that prompted this second correction. The
+		   direct hash matches added below (confirmed stable across
+		   several different tracks within this Spotify build, unlike the
+		   hashes from earlier sessions which changed between Spotify
+		   *versions*) don't depend on About Artist existing at all, so
+		   they cover this case; the position-based selectors stay too, as
+		   a fallback for whenever these particular hashes next change.
 		   About Artist itself carries a stable semantic class
 		   (.main-nowPlayingView-aboutArtist) — it used to be a bare hash,
 		   a7gn1W5xEIEyxWUU, which is what the old rule matched; that hash
 		   is gone. Credits/On Tour/Merch have no semantic hook of their
-		   own any more, so they're matched by position off of that one
-		   stable anchor instead. */
+		   own any more, so hash + position are combined below instead. */
 		body.__cleanest_hide_aboutartist .main-nowPlayingView-aboutArtist {
 			display: none !important;
 		}
+		body.__cleanest_hide_credits [class~="xjtJh3fBlistN0It9RnM"],
 		body.__cleanest_hide_credits .main-nowPlayingView-aboutArtist + .main-nowPlayingView-section:not(:last-of-type) {
 			display: none !important;
 		}
+		body.__cleanest_hide_ontour [class~="Nn9K90s4j87sjhQ5qPF7"],
 		body.__cleanest_hide_ontour .main-nowPlayingView-aboutArtist + .main-nowPlayingView-section + .main-nowPlayingView-section:not(:last-of-type) {
 			display: none !important;
 		}
+		body.__cleanest_hide_merch [class~="hGskSJM3bQ9pufiDFfv7"],
 		body.__cleanest_hide_merch .main-nowPlayingView-aboutArtist + .main-nowPlayingView-section + .main-nowPlayingView-section + .main-nowPlayingView-section:not(:last-of-type) {
 			display: none !important;
 		}
@@ -1904,6 +1959,18 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 		}
 		.cleanestAdvancedResetButton:hover {
 			background: rgba(255, 107, 107, 0.22);
+		}
+		.cleanestAdvancedActionButton {
+			padding: 6px 10px;
+			cursor: pointer;
+			color: var(--spice-text);
+			background: rgba(var(--spice-rgb-selected-row), 0.14);
+			border: none;
+			border-radius: 4px;
+			font-size: 0.8125rem;
+		}
+		.cleanestAdvancedActionButton:hover {
+			background: rgba(var(--spice-rgb-selected-row), 0.24);
 		}
 		.cleanestSubHeader {
 			font-size: 0.75rem;
@@ -2538,6 +2605,7 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 	let loudnessCeil = -5;      // this track's own loudest segment peak (dB), for normalization
 	let audioBeats = null;      // beats[] from Spicetify.getAudioData() — primary source (rhythmic "punch")
 	let beatCursor = 0;
+	let trackTempo = null;      // data.track.tempo (BPM) from Spicetify.getAudioData() — fallback 1, see getBpmPulse()
 	let smoothedBrightness = 1;
 	let smoothedSizeMult = 1;
 
@@ -2632,14 +2700,55 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 		segmentCursor = 0;
 		audioBeats = null;
 		beatCursor = 0;
+		trackTempo = null;
 		// Always fetched regardless of the reactive toggle, so switching it
 		// on in settings takes effect immediately instead of waiting for
 		// the next song change.
+		let data = null;
 		try {
-			const data = await Spicetify.getAudioData();
+			data = await Spicetify.getAudioData();
+		} catch (err) {
+			// Spicetify.getAudioData() hits Spotify's internal-only
+			// spclient.wg.spotify.com/audio-attributes/v1/audio-analysis
+			// endpoint, which has recently started failing outright for
+			// everyone (see the big comment above getBpmPulse()/
+			// connectAudioBridge() below). Found via
+			// github.com/Erozah/spicetify-visualizer's
+			// SpotifyAnalysisTrackLoader.js, which anticipates exactly this
+			// and falls back to the PUBLIC api.spotify.com/v1/audio-analysis
+			// endpoint using the desktop client's OWN access token
+			// (Spicetify.getAccessToken()) instead. That's a genuinely
+			// different request path from a third-party app's OAuth token —
+			// it's the actual client authenticating as itself — so it isn't
+			// necessarily caught by the "extended quota mode" restriction
+			// Spotify put on that endpoint for new developer app
+			// registrations back in Nov 2024. Worth trying since the two
+			// failures are independent, even though the primary path is
+			// down right now.
+			try {
+				const item = Spicetify.Player.data && Spicetify.Player.data.item;
+				const uri = item && item.uri;
+				const trackId = uri && uri.replace("spotify:track:", "").split("?")[0].trim();
+				if (trackId && Spicetify.getAccessToken) {
+					const token = await Spicetify.getAccessToken();
+					if (token) {
+						const response = await fetch(`https://api.spotify.com/v1/audio-analysis/${trackId}`, {
+							headers: { Authorization: `Bearer ${token}` },
+						});
+						if (response.ok) data = await response.json();
+					}
+				}
+			} catch (fallbackErr) {
+				data = null;
+			}
+		}
 
+		try {
 			const beats = data && data.beats;
 			if (beats && beats.length) audioBeats = beats;
+
+			const tempo = data && data.track && data.track.tempo;
+			if (typeof tempo === "number" && tempo > 0) trackTempo = tempo;
 
 			const segments = data && data.segments;
 			if (!segments || !segments.length) return;
@@ -2665,6 +2774,7 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 			// Not every track has analysis data (podcasts, some local files, etc.)
 			audioSegments = null;
 			audioBeats = null;
+			trackTempo = null;
 		}
 	}
 
@@ -2674,6 +2784,189 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 	// (kick/bass usually drives the rhythmic pulse in most music), decaying
 	// quickly afterward — rather than the broader, slower loudness curve
 	// (which vocals/cymbals/etc. also move).
+
+	// --- Reactive fallbacks (both opt-in via Advanced Theme Settings; off
+	// by default so the plain "Animated Ambience"/"Animated edge glow"
+	// toggles in Cleanest Settings keep behaving exactly like they always
+	// did — real beat/loudness data or nothing) ---
+	//
+	// Spicetify.getAudioData() has recently started failing outright for
+	// everyone — "Resolver not found!" on the internal spclient.wg audio-
+	// analysis endpoint it depends on, confirmed as of this week affecting
+	// other, unrelated Spicetify audio-reactive extensions too (not just
+	// this theme). That's a separate, internal-only endpoint from the
+	// public Web API's audio-analysis/audio-features, which Spotify
+	// deprecated back in Nov 2024 — this one kept working fine until very
+	// recently, so this looks like a new server-side change on Spotify's
+	// end rather than anything client-side to fix, and it may or may not
+	// come back. With it down, audioBeats/audioSegments/trackTempo all
+	// stay null forever (see the catch in loadAudioAnalysis() below).
+	//
+	// Fallback 1 — BPM pulse: loadAudioAnalysis() below also reads
+	// data.track.tempo from the very same response as beats/segments, so
+	// in practice this fails together with everything else right now (one
+	// failed request, not three) — but it's cheap to keep separate in
+	// case a future Spotify change restores tempo without the full
+	// per-beat/segment breakdown, and it's an honest "reacts to the
+	// song's actual tempo" fallback rather than a made-up animation.
+	// Synthesizes evenly-spaced beats from the tempo alone (no real
+	// timestamps needed) and reuses the exact same decay shape as
+	// getBeatPunch() below for a consistent feel.
+	function getBpmPulse(posSec) {
+		if (!trackTempo || trackTempo <= 0) return null;
+		const interval = 60 / trackTempo;
+		const sinceBeat = posSec % interval;
+		const decaySeconds = Math.min(interval * 0.4, 0.2);
+		return Math.exp(-sinceBeat / decaySeconds);
+	}
+
+	// Fallback 2 — local audio bridge (Windows only, experimental): a
+	// separate, external process (cleanest_audio_bridge.py) that captures
+	// real system audio via WASAPI loopback and streams bass/mid/treble/
+	// energy/beat data over a local WebSocket. This is a genuinely
+	// different approach from an in-page AnalyserNode, which was tried and
+	// ruled out: getUserMedia/getDisplayMedia are confirmed NOT usable
+	// from Spotify's own renderer at all — not a permissions issue, not
+	// fixable from here — per another Spicetify visualizer author's own
+	// documented findings (github.com/Dr1mS/spicetify-vizualizer:
+	// "no page running inside Spotify can hear the player"). Running the
+	// capture as its own OS-level process instead sidesteps that renderer
+	// restriction entirely. Real constraints, neither fixable from here:
+	//   1. The bridge script has to actually be running (`python
+	//      cleanest_audio_bridge.py`) — if it's not, this just never
+	//      connects and the fallback chain moves on to BPM/flat.
+	//   2. It captures the system's whole output device, not Spotify
+	//      specifically (Windows has no simple, dependency-free way to
+	//      grab one app's audio) — anything else making sound gets picked
+	//      up too.
+	//   3. Windows only for now (WASAPI loopback via PyAudioWPatch).
+	let bridgeSocket = null;
+	let bridgeData = null; // last {bass, mid, treble, energy, beat} from the bridge, or null if not connected
+	let bridgeLastBeatTime = 0; // performance.now() of the last beat event actually received
+	let bridgeReconnectTimer = null;
+	function reportBridgeStatus(text) {
+		// Same persist-on-body pattern as the settings toggles elsewhere in
+		// this file — lets the Advanced Theme Settings modal show the
+		// CURRENT status immediately on open, not just future changes.
+		document.body.dataset.cleanestBridgeStatus = text;
+		document.dispatchEvent(new CustomEvent("cleanest-bridge-status", { detail: { text } }));
+	}
+	function connectAudioBridge() {
+		if (bridgeSocket) return;
+		reportBridgeStatus("Connecting…");
+		let socket;
+		try {
+			socket = new WebSocket("ws://127.0.0.1:8787");
+		} catch (err) {
+			reportBridgeStatus("Failed to open WebSocket.");
+			scheduleBridgeReconnect();
+			return;
+		}
+		bridgeSocket = socket;
+		socket.addEventListener("open", () => {
+			reportBridgeStatus("Connected.");
+		});
+		socket.addEventListener("message", (event) => {
+			try {
+				bridgeData = JSON.parse(event.data);
+				// Captured here, at the moment the message arrives, rather
+				// than read lazily from bridgeData later — the "beat" flag
+				// is only true in the one message where a beat was actually
+				// detected, and bridgeData gets overwritten by every
+				// message after that (~47/sec from the bridge), so reading
+				// it lazily from inside the animation loop could land on a
+				// later, non-beat message and miss it entirely.
+				if (bridgeData && bridgeData.beat) {
+					bridgeLastBeatTime = performance.now();
+				}
+			} catch (err) {
+				// Ignore a malformed frame rather than tearing down the
+				// connection over it.
+			}
+		});
+		socket.addEventListener("close", () => {
+			bridgeSocket = null;
+			bridgeData = null;
+			reportBridgeStatus("Disconnected — retrying…");
+			scheduleBridgeReconnect();
+		});
+		socket.addEventListener("error", () => {
+			// "close" always follows "error" for a WebSocket, so the actual
+			// cleanup/retry happens there — this only avoids an unhandled
+			// error spamming the console every retry.
+		});
+	}
+	function scheduleBridgeReconnect() {
+		if (bridgeReconnectTimer) return;
+		bridgeReconnectTimer = setTimeout(() => {
+			bridgeReconnectTimer = null;
+			if (document.body.classList.contains("__cleanest_reactive_fallback_bridge")) {
+				connectAudioBridge();
+			}
+		}, 3000); // bridge script may just not be running yet/right now — keep trying quietly rather than giving up
+	}
+	function disconnectAudioBridge() {
+		if (bridgeReconnectTimer) {
+			clearTimeout(bridgeReconnectTimer);
+			bridgeReconnectTimer = null;
+		}
+		if (bridgeSocket) {
+			bridgeSocket.close();
+			bridgeSocket = null;
+		}
+		bridgeData = null;
+		bridgeLastBeatTime = 0;
+		reportBridgeStatus("Not started.");
+	}
+	// Connects/disconnects in step with the toggle itself, rather than only
+	// checking the toggle from inside the animation loop — no point holding
+	// a live socket open when the fallback that uses it is switched off.
+	let bridgeToggleWasOn = false;
+	function syncAudioBridgeConnection() {
+		const isOn = document.body.classList.contains("__cleanest_reactive_fallback_bridge");
+		if (isOn && !bridgeToggleWasOn) connectAudioBridge();
+		else if (!isOn && bridgeToggleWasOn) disconnectAudioBridge();
+		bridgeToggleWasOn = isOn;
+	}
+	document.addEventListener("cleanest-settings-changed", syncAudioBridgeConnection);
+	syncAudioBridgeConnection(); // in case the toggle was already on from a previous session
+	function getBridgeBassLevel() {
+		if (!bridgeData) return null;
+		if (document.body.classList.contains("__cleanest_reactive_bridge_bassonly")) {
+			// Continuous bass-band level, smoothly following the music's
+			// actual bass energy as it rises and falls — rather than
+			// flashing sharply on each detected beat and decaying to zero
+			// in between, which is the default (see below) and is closer
+			// to "punch"/"hit" than "bass level".
+			return typeof bridgeData.bass === "number" ? bridgeData.bass : 0;
+		}
+		if (!bridgeLastBeatTime) return null;
+		// Turned into the same decaying-flash shape as getBeatPunch()/
+		// getBpmPulse() above for a consistent feel, rather than passing
+		// the raw continuous bass level straight through — that pulses far
+		// more subtly than an actual beat flash, since it just tracks
+		// bass-band loudness rather than discrete hits.
+		const sinceBeatSec = (performance.now() - bridgeLastBeatTime) / 1000;
+		const decaySeconds = 0.15;
+		return Math.exp(-sinceBeatSec / decaySeconds);
+	}
+
+	// Tries the local bridge first (if enabled and actually connected),
+	// then BPM (if enabled and tempo is known), then gives up — landing on
+	// flat/static, the exact old behavior, if neither fallback is turned
+	// on or neither has anything to offer.
+	function getFallbackNorm(posSec) {
+		if (document.body.classList.contains("__cleanest_reactive_fallback_bridge")) {
+			const level = getBridgeBassLevel();
+			if (level !== null) return level;
+		}
+		if (document.body.classList.contains("__cleanest_reactive_fallback_bpm")) {
+			const bpm = getBpmPulse(posSec);
+			if (bpm !== null) return bpm;
+		}
+		return 0;
+	}
+
 	function getBeatPunch(posSec) {
 		if (!audioBeats || audioBeats.length === 0) return null;
 
@@ -3019,6 +3312,22 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 			const wlAudioEl = document.getElementById("wavelink-audio");
 			isPaused = wlAudioEl ? wlAudioEl.paused : true;
 		}
+		// The local audio bridge captures real system audio directly,
+		// independent of Spotify's own playback state entirely — Spotify
+		// being paused says nothing about whether audio is actually
+		// playing (the whole point of testing the bridge against
+		// something other than Spotify, e.g. a YouTube tab, while Spotify
+		// itself sits paused). If the bridge is live, trust that instead;
+		// an actually-silent source still reads as silent through the
+		// bridge's own data (see MIN_OVERALL_ENERGY_FOR_BEAT in the bridge
+		// script), so this doesn't force a reaction out of nothing.
+		if (
+			document.body.classList.contains("__cleanest_reactive_fallback_bridge") &&
+			bridgeSocket &&
+			bridgeSocket.readyState === WebSocket.OPEN
+		) {
+			isPaused = false;
+		}
 		const posSec = getPrecisePositionMs() / 1000;
 		// No real audio-reactive data source exists for Wavelink tracks
 		// (see the big comment above getWavelinkRenderedCoverUrl/the old
@@ -3043,6 +3352,11 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 				if (db !== null) {
 					norm = Math.min(Math.max((db - loudnessFloor) / (loudnessCeil - loudnessFloor), 0), 1);
 				}
+			} else {
+				// No real analysis data at all — opt-in fallbacks only
+				// (see getFallbackNorm above); returns 0 (flat, old
+				// behavior) if neither is enabled/available.
+				norm = getFallbackNorm(posSec);
 			}
 			const boost = settings.edgeBoost;
 			edgeTarget = 1 + norm * (boost - 1);
@@ -3190,6 +3504,11 @@ const AMBIENCE_REACTIVE_SMOOTHING = 0.25; // 0-1 per frame; higher = snappier, l
 				if (db !== null) {
 					punchNorm = Math.min(Math.max((db - loudnessFloor) / (loudnessCeil - loudnessFloor), 0), 1);
 				}
+			} else {
+				// No real analysis data at all — opt-in fallbacks only
+				// (see getFallbackNorm above); returns 0 (flat, old
+				// behavior) if neither is enabled/available.
+				punchNorm = getFallbackNorm(posSec);
 			}
 		}
 
